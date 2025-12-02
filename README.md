@@ -1,5 +1,6 @@
 # Veld DI Framework
 
+[![CI/CD](https://github.com/yasmramos/Veld/actions/workflows/ci.yml/badge.svg)](https://github.com/yasmramos/Veld/actions/workflows/ci.yml)
 [![Java](https://img.shields.io/badge/Java-11%2B-orange)](https://openjdk.java.net/)
 [![Maven](https://img.shields.io/badge/Maven-3.6%2B-blue)](https://maven.apache.org/)
 [![License](https://img.shields.io/badge/License-Apache%202.0-green.svg)](LICENSE)
