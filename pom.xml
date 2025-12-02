@@ -11,6 +11,21 @@
 
     <name>Veld Framework</name>
     <description>Dependency Injection Framework using pure ASM bytecode generation - No Reflection</description>
+    <url>https://github.com/yasmramos/Veld</url>
+    
+    <licenses>
+        <license>
+            <name>Apache License, Version 2.0</name>
+            <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+            <distribution>repo</distribution>
+        </license>
+    </licenses>
+    
+    <scm>
+        <url>https://github.com/yasmramos/Veld</url>
+        <connection>scm:git:git://github.com/yasmramos/Veld.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/yasmramos/Veld.git</developerConnection>
+    </scm>
 
     <modules>
         <module>veld-annotations</module>
