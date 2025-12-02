@@ -19,6 +19,9 @@ public final class ComponentInfo {
     private final List<InjectionPoint> fieldInjections = new ArrayList<>();
     private final List<InjectionPoint> methodInjections = new ArrayList<>();
     
+    // Interfaces implemented by this component (for interface-based injection)
+    private final List<String> implementedInterfaces = new ArrayList<>();
+    
     private String postConstructMethod;          // Method name with @PostConstruct
     private String postConstructDescriptor;
     private String preDestroyMethod;             // Method name with @PreDestroy
@@ -119,5 +122,46 @@ public final class ComponentInfo {
     
     public boolean hasMethodInjections() {
         return !methodInjections.isEmpty();
+    }
+    
+    // Interface-based injection support
+    
+    /**
+     * Returns all interfaces implemented by this component.
+     * Used for interface-based injection.
+     * 
+     * @return list of fully qualified interface names
+     */
+    public List<String> getImplementedInterfaces() {
+        return implementedInterfaces;
+    }
+    
+    /**
+     * Returns all interfaces in ASM internal name format.
+     * 
+     * @return list of internal names (e.g., "com/example/UserRepository")
+     */
+    public List<String> getImplementedInterfacesInternal() {
+        return implementedInterfaces.stream()
+                .map(name -> name.replace('.', '/'))
+                .toList();
+    }
+    
+    /**
+     * Adds an interface that this component implements.
+     * 
+     * @param interfaceName fully qualified interface name
+     */
+    public void addImplementedInterface(String interfaceName) {
+        this.implementedInterfaces.add(interfaceName);
+    }
+    
+    /**
+     * Checks if this component implements any interfaces.
+     * 
+     * @return true if component implements at least one interface
+     */
+    public boolean hasImplementedInterfaces() {
+        return !implementedInterfaces.isEmpty();
     }
 }

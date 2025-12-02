@@ -10,6 +10,9 @@ import java.util.Optional;
 /**
  * User service - Singleton scope.
  * Demonstrates method injection with @Inject on setter.
+ * 
+ * NOTE: This class injects IUserRepository (interface), NOT the concrete class.
+ * Veld will automatically resolve IUserRepository -> UserRepositoryImpl.
  */
 @Component
 @Singleton
@@ -17,7 +20,7 @@ public class UserService {
     
     private LogService logService;
     private ConfigService configService;
-    private UserRepository userRepository;
+    private IUserRepository userRepository; // <-- Interface, not concrete class!
     
     public UserService() {
         System.out.println("[UserService] Constructor called");
@@ -36,9 +39,9 @@ public class UserService {
     }
     
     @Inject
-    public void setUserRepository(UserRepository userRepository) {
+    public void setUserRepository(IUserRepository userRepository) {  // <-- Interface injection!
         this.userRepository = userRepository;
-        System.out.println("[UserService] UserRepository injected via method");
+        System.out.println("[UserService] IUserRepository injected via method -> " + userRepository.getClass().getSimpleName());
     }
     
     @PostConstruct

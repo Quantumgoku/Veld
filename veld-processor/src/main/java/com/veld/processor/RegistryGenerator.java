@@ -187,6 +187,21 @@ public final class RegistryGenerator {
             // Also register by the component type itself in factoriesBySupertype
             registerInSupertypeMap(mv, localVarIndex, componentInternal);
             
+            // Register by all implemented interfaces for interface-based injection
+            for (String interfaceInternal : comp.getImplementedInterfacesInternal()) {
+                // factoriesByType.put(Interface.class, factory)
+                mv.visitVarInsn(ALOAD, 0);
+                mv.visitFieldInsn(GETFIELD, REGISTRY_NAME, "factoriesByType", "L" + MAP + ";");
+                mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(interfaceInternal));
+                mv.visitVarInsn(ALOAD, localVarIndex);
+                mv.visitMethodInsn(INVOKEINTERFACE, MAP, "put",
+                        "(L" + OBJECT + ";L" + OBJECT + ";)L" + OBJECT + ";", true);
+                mv.visitInsn(POP);
+                
+                // Also register in factoriesBySupertype for getAll() and getFactoriesForType()
+                registerInSupertypeMap(mv, localVarIndex, interfaceInternal);
+            }
+            
             localVarIndex++;
         }
         

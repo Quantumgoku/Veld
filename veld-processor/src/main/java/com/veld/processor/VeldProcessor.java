@@ -18,7 +18,9 @@ import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
@@ -46,6 +48,9 @@ public class VeldProcessor extends AbstractProcessor {
     private final List<ComponentInfo> discoveredComponents = new ArrayList<>();
     private final DependencyGraph dependencyGraph = new DependencyGraph();
     
+    // Maps interface -> list of implementing components (for conflict detection)
+    private final Map<String, List<String>> interfaceImplementors = new HashMap<>();
+    
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
@@ -61,6 +66,8 @@ public class VeldProcessor extends AbstractProcessor {
             if (!discoveredComponents.isEmpty()) {
                 // Check for circular dependencies before generating code
                 if (validateNoCyclicDependencies()) {
+                    // Validate interface implementations (warnings only)
+                    validateInterfaceImplementations();
                     generateRegistry();
                 }
             }
@@ -182,7 +189,77 @@ public class VeldProcessor extends AbstractProcessor {
         analyzeMethods(typeElement, info);
         analyzeLifecycle(typeElement, info);
         
+        // Analyze implemented interfaces for interface-based injection
+        analyzeInterfaces(typeElement, info);
+        
         return info;
+    }
+    
+    /**
+     * Analyzes all interfaces implemented by the component.
+     * These interfaces will be used for interface-based injection.
+     */
+    private void analyzeInterfaces(TypeElement typeElement, ComponentInfo info) {
+        for (TypeMirror interfaceType : typeElement.getInterfaces()) {
+            if (interfaceType.getKind() == TypeKind.DECLARED) {
+                DeclaredType declaredType = (DeclaredType) interfaceType;
+                TypeElement interfaceElement = (TypeElement) declaredType.asElement();
+                String interfaceName = interfaceElement.getQualifiedName().toString();
+                
+                // Skip standard Java interfaces that are unlikely to be injection targets
+                if (!interfaceName.startsWith("java.lang.") && 
+                    !interfaceName.startsWith("java.io.") &&
+                    !interfaceName.startsWith("java.util.")) {
+                    info.addImplementedInterface(interfaceName);
+                    
+                    // Track interface implementors for conflict detection
+                    interfaceImplementors
+                        .computeIfAbsent(interfaceName, k -> new ArrayList<>())
+                        .add(info.getClassName());
+                    
+                    note("  -> Implements interface: " + interfaceName);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Validates that there are no ambiguous interface implementations.
+     * Multiple implementations of the same interface require @Named to disambiguate.
+     * 
+     * @return true if validation passes (with possible warnings), false if critical errors
+     */
+    private boolean validateInterfaceImplementations() {
+        boolean hasConflicts = false;
+        
+        for (Map.Entry<String, List<String>> entry : interfaceImplementors.entrySet()) {
+            String interfaceName = entry.getKey();
+            List<String> implementors = entry.getValue();
+            
+            if (implementors.size() > 1) {
+                // Multiple implementations - warn the user
+                StringBuilder sb = new StringBuilder();
+                sb.append("Multiple implementations found for interface: ")
+                  .append(interfaceName)
+                  .append("\n  Implementations: ");
+                for (int i = 0; i < implementors.size(); i++) {
+                    if (i > 0) sb.append(", ");
+                    sb.append(implementors.get(i));
+                }
+                sb.append("\n  Use @Named to disambiguate when injecting this interface.");
+                sb.append("\n  Without @Named, the last registered implementation will be used: ")
+                  .append(implementors.get(implementors.size() - 1));
+                
+                warning(null, sb.toString());
+                hasConflicts = true;
+            }
+        }
+        
+        if (hasConflicts) {
+            note("Interface conflict detection complete. Use @Named for explicit selection.");
+        }
+        
+        return true; // Warnings don't stop compilation
     }
     
     private void analyzeConstructors(TypeElement typeElement, ComponentInfo info) throws ProcessingException {
@@ -409,6 +486,10 @@ public class VeldProcessor extends AbstractProcessor {
     
     private void error(Element element, String message) {
         messager.printMessage(Diagnostic.Kind.ERROR, "[Veld] " + message, element);
+    }
+    
+    private void warning(Element element, String message) {
+        messager.printMessage(Diagnostic.Kind.WARNING, "[Veld] " + message, element);
     }
     
     private void note(String message) {

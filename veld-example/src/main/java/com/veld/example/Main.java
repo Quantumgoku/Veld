@@ -6,12 +6,13 @@ import com.veld.runtime.VeldContainer;
  * Main class demonstrating Veld DI framework capabilities.
  * 
  * This example shows:
- * 1. Constructor injection (UserRepository, EmailNotification)
+ * 1. Constructor injection (UserRepositoryImpl, EmailNotification)
  * 2. Field injection (ConfigService, RequestContext)
  * 3. Method injection (UserService)
- * 4. @Singleton scope (LogService, ConfigService, UserRepository, UserService)
+ * 4. @Singleton scope (LogService, ConfigService, UserRepositoryImpl, UserService)
  * 5. @Prototype scope (RequestContext, EmailNotification)
  * 6. @PostConstruct and @PreDestroy lifecycle callbacks
+ * 7. Interface-based injection (IUserRepository -> UserRepositoryImpl)
  * 
  * Simple API: Just create a new VeldContainer() - that's it!
  * All bytecode generation happens at compile-time using ASM.
@@ -46,7 +47,12 @@ public class Main {
             demonstrateInjectionChain(container);
             
             System.out.println("\n══════════════════════════════════════════════════════════");
-            System.out.println("4. SERVICE USAGE");
+            System.out.println("4. INTERFACE-BASED INJECTION");
+            System.out.println("══════════════════════════════════════════════════════════");
+            demonstrateInterfaceInjection(container);
+            
+            System.out.println("\n══════════════════════════════════════════════════════════");
+            System.out.println("5. SERVICE USAGE");
             System.out.println("══════════════════════════════════════════════════════════");
             demonstrateServiceUsage(container);
             
@@ -123,6 +129,34 @@ public class Main {
         LogService directLog = container.get(LogService.class);
         System.out.println("  LogService from container == LogService in ConfigService? " + 
             (directLog == injectedLog ? "YES ✓" : "NO ✗"));
+    }
+    
+    /**
+     * Demonstrates interface-based injection.
+     * IUserRepository is an interface, UserRepositoryImpl is the implementation.
+     * Veld automatically resolves the interface to its implementation.
+     */
+    private static void demonstrateInterfaceInjection(VeldContainer container) {
+        System.out.println("\n→ Injecting by INTERFACE (IUserRepository):");
+        IUserRepository repoByInterface = container.get(IUserRepository.class);
+        System.out.println("  Requested: IUserRepository.class");
+        System.out.println("  Received:  " + repoByInterface.getClass().getSimpleName());
+        System.out.println("  Is UserRepositoryImpl? " + 
+            (repoByInterface instanceof UserRepositoryImpl ? "YES ✓" : "NO ✗"));
+        
+        System.out.println("\n→ Injecting by CONCRETE CLASS (UserRepositoryImpl):");
+        UserRepositoryImpl repoByClass = container.get(UserRepositoryImpl.class);
+        System.out.println("  Requested: UserRepositoryImpl.class");
+        System.out.println("  Received:  " + repoByClass.getClass().getSimpleName());
+        
+        System.out.println("\n→ Verifying singleton consistency:");
+        System.out.println("  Same instance? " + (repoByInterface == repoByClass ? "YES ✓" : "NO ✗"));
+        System.out.println("  Both hashCodes: " + System.identityHashCode(repoByInterface) + 
+            " == " + System.identityHashCode(repoByClass));
+        
+        System.out.println("\n→ UserService injects IUserRepository (interface):");
+        System.out.println("  This demonstrates that services can depend on interfaces,");
+        System.out.println("  and Veld resolves them to concrete implementations automatically.");
     }
     
     /**
