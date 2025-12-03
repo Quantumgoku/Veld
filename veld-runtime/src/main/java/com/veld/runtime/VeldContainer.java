@@ -6,6 +6,7 @@ import java.lang.invoke.MethodType;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * The main dependency injection container for Veld.
@@ -207,7 +208,7 @@ public class VeldContainer {
         List<ComponentFactory<? extends T>> factories = registry.getFactoriesForType(type);
         return factories.stream()
                 .map(factory -> (T) getInstance(factory))
-                .toList();
+                .collect(Collectors.toList());
     }
 
     /**
