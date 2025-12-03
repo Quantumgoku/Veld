@@ -50,6 +50,11 @@
         </dependency>
     </dependencies>
 
+    <properties>
+        <!-- Skip deployment for example module -->
+        <maven.deploy.skip>true</maven.deploy.skip>
+    </properties>
+
     <build>
         <plugins>
             <!-- Standard Maven Compiler - SINGLE PHASE, SIMPLE CONFIGURATION -->
