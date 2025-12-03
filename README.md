@@ -19,6 +19,7 @@ A lightweight, compile-time Dependency Injection framework for Java using pure A
 - **Lazy Initialization**: `@Lazy` for deferred component creation
 - **Provider Injection**: `Provider<T>` for on-demand instance creation
 - **Optional Injection**: `@Optional` and `Optional<T>` for graceful handling of missing dependencies
+- **Conditional Registration**: `@ConditionalOnProperty`, `@ConditionalOnClass`, `@ConditionalOnMissingBean`
 - **Interface-Based Injection**: Inject by interface, resolved to concrete implementations
 - **Lifecycle Callbacks**: `@PostConstruct` and `@PreDestroy` support
 - **Circular Dependency Detection**: Compile-time detection with clear error messages
@@ -127,6 +128,7 @@ Veld supports annotations from three sources, which can be mixed freely:
 | Prototype | `@Prototype` | - | - |
 | Lazy | `@Lazy` | - | - |
 | Optional | `@Optional` | - | - |
+| Conditional | `@ConditionalOnProperty`, `@ConditionalOnClass`, `@ConditionalOnMissingBean` | - | - |
 | Qualifier | `@Named` | `@Named` | `@Named` |
 | Provider | `Provider<T>` | `Provider<T>` | `Provider<T>` |
 | Post-construct | `@PostConstruct` | - | - |
@@ -320,6 +322,110 @@ CacheService cache = container.tryGet(CacheService.class);
 Optional<MetricsService> metrics = container.getOptional(MetricsService.class);
 ```
 
+## Conditional Configuration
+
+Veld supports conditional component registration, similar to Spring Boot's auto-configuration.
+
+### @ConditionalOnProperty
+
+Register a component only when a system property or environment variable matches:
+
+```java
+@Singleton
+@ConditionalOnProperty(name = "app.debug", havingValue = "true")
+public class DebugService {
+    // Only registered when -Dapp.debug=true or APP_DEBUG=true
+}
+
+@Singleton
+@ConditionalOnProperty(name = "feature.x.enabled", matchIfMissing = true)
+public class FeatureXService {
+    // Registered by default, unless feature.x.enabled=false
+}
+```
+
+**Attributes:**
+- `name`: Property name (also checks environment variable with underscores, e.g., `app.debug` → `APP_DEBUG`)
+- `havingValue`: Expected value (default: "true")
+- `matchIfMissing`: Register if property is not set (default: false)
+
+### @ConditionalOnClass
+
+Register a component only when specific classes are available in the classpath:
+
+```java
+@Singleton
+@ConditionalOnClass(name = "com.fasterxml.jackson.databind.ObjectMapper")
+public class JacksonJsonService {
+    // Only registered if Jackson is on the classpath
+}
+
+@Singleton
+@ConditionalOnClass(value = {DataSource.class, HikariDataSource.class})
+public class HikariPoolService {
+    // Only registered if both classes are available
+}
+```
+
+**Attributes:**
+- `value`: Array of Class objects to check
+- `name`: Array of fully-qualified class names to check
+
+### @ConditionalOnMissingBean
+
+Register a component only when specific beans are NOT already registered (useful for fallbacks):
+
+```java
+public interface DatabaseService {
+    void connect();
+}
+
+@Singleton
+@ConditionalOnMissingBean(DatabaseService.class)
+public class DefaultDatabaseService implements DatabaseService {
+    // Only registered if no other DatabaseService exists
+    // Acts as a fallback/default implementation
+}
+
+@Singleton
+public class PostgresDatabaseService implements DatabaseService {
+    // If this is registered, DefaultDatabaseService won't be
+}
+```
+
+**Attributes:**
+- `value`: Array of bean types to check
+- `name`: Array of bean names to check
+
+### Combining Conditions
+
+Multiple conditions can be combined (all must match):
+
+```java
+@Singleton
+@ConditionalOnProperty(name = "cache.enabled", havingValue = "true")
+@ConditionalOnClass(name = "redis.clients.jedis.Jedis")
+public class RedisCacheService {
+    // Only registered when:
+    // 1. cache.enabled=true AND
+    // 2. Jedis is on the classpath
+}
+```
+
+### Runtime Condition Evaluation
+
+Conditions are evaluated at container initialization:
+
+```java
+// Set properties before creating container
+System.setProperty("app.debug", "true");
+
+VeldContainer container = new VeldContainer();
+
+// DebugService is now available
+DebugService debug = container.get(DebugService.class);
+```
+
 ## Lifecycle Callbacks
 
 ```java
@@ -354,6 +460,9 @@ Veld/
 │           ├── Prototype.java
 │           ├── Lazy.java
 │           ├── Optional.java
+│           ├── ConditionalOnProperty.java
+│           ├── ConditionalOnClass.java
+│           ├── ConditionalOnMissingBean.java
 │           ├── Named.java
 │           ├── PostConstruct.java
 │           └── PreDestroy.java
@@ -363,6 +472,7 @@ Veld/
 │           ├── VeldProcessor.java      # Main processor
 │           ├── AnnotationHelper.java   # Multi-source annotation detection
 │           ├── ComponentInfo.java      # Component metadata
+│           ├── ConditionInfo.java      # Condition metadata
 │           ├── DependencyGraph.java    # Cycle detection
 │           └── ...
 ├── veld-runtime/              # Runtime container
@@ -372,7 +482,15 @@ Veld/
 │           ├── ComponentRegistry.java
 │           ├── ComponentFactory.java
 │           ├── Provider.java
-│           └── LazyHolder.java
+│           ├── LazyHolder.java
+│           ├── ConditionalRegistry.java
+│           └── condition/
+│               ├── Condition.java
+│               ├── ConditionContext.java
+│               ├── ConditionEvaluator.java
+│               ├── PropertyCondition.java
+│               ├── ClassCondition.java
+│               └── MissingBeanCondition.java
 └── veld-example/              # Example application
     └── src/main/java/
         └── com/veld/example/
@@ -436,6 +554,14 @@ public class UserService$$VeldFactory implements ComponentFactory<UserService> {
 ```
 
 ## Changelog
+
+### v1.0.0-alpha.4 (2025-12-03)
+- Added `@ConditionalOnProperty` for property-based component registration
+- Added `@ConditionalOnClass` for classpath-based component registration
+- Added `@ConditionalOnMissingBean` for fallback component registration
+- Added `ConditionContext` for runtime condition evaluation
+- Added `ConditionalRegistry` for filtering components based on conditions
+- Conditions evaluated at container initialization time
 
 ### v1.0.0-alpha.3 (2025-12-03)
 - Added `@Optional` annotation for optional dependency injection
