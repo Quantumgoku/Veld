@@ -44,6 +44,7 @@ public final class ComponentFactoryGenerator {
     private static final String ARRAYS = "java/util/Arrays";
     private static final String CONDITION_CONTEXT = "com/veld/runtime/condition/ConditionContext";
     private static final String CONDITION_EVALUATOR = "com/veld/runtime/condition/ConditionEvaluator";
+    private static final String VALUE_RESOLVER = "com/veld/runtime/value/ValueResolver";
     
     private final ComponentInfo component;
     
@@ -184,7 +185,10 @@ public final class ComponentFactoryGenerator {
     }
     
     private void loadDependency(MethodVisitor mv, Dependency dep) {
-        if (dep.isOptionalWrapper()) {
+        if (dep.isValueInjection()) {
+            // For @Value, resolve the value expression
+            loadValueDependency(mv, dep);
+        } else if (dep.isOptionalWrapper()) {
             // For Optional<T>, call container.getOptional(T.class)
             loadOptionalWrapperDependency(mv, dep);
         } else if (dep.isOptional()) {
@@ -199,6 +203,93 @@ public final class ComponentFactoryGenerator {
         } else {
             // Regular dependency
             loadRegularDependency(mv, dep);
+        }
+    }
+    
+    private void loadValueDependency(MethodVisitor mv, Dependency dep) {
+        String valueExpression = dep.getValueExpression();
+        String typeName = dep.getTypeName();
+        
+        // ValueResolver.getInstance().resolve(expression, targetType)
+        mv.visitMethodInsn(INVOKESTATIC, VALUE_RESOLVER, "getInstance",
+                "()L" + VALUE_RESOLVER + ";", false);
+        mv.visitLdcInsn(valueExpression);
+        
+        // Get the target class for type conversion
+        switch (typeName) {
+            case "int":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Integer;"));
+                break;
+            case "long":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Long;"));
+                break;
+            case "double":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Double;"));
+                break;
+            case "float":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Float;"));
+                break;
+            case "boolean":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Boolean;"));
+                break;
+            case "byte":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Byte;"));
+                break;
+            case "short":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Short;"));
+                break;
+            case "char":
+                mv.visitLdcInsn(org.objectweb.asm.Type.getType("Ljava/lang/Character;"));
+                break;
+            default:
+                // Object type (usually String)
+                String typeInternal = typeName.replace('.', '/');
+                mv.visitLdcInsn(org.objectweb.asm.Type.getObjectType(typeInternal));
+                break;
+        }
+        
+        mv.visitMethodInsn(INVOKEVIRTUAL, VALUE_RESOLVER, "resolve",
+                "(L" + STRING + ";L" + CLASS + ";)L" + OBJECT + ";", false);
+        
+        // Convert to primitive if necessary
+        switch (typeName) {
+            case "int":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Integer");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Integer", "intValue", "()I", false);
+                break;
+            case "long":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Long");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Long", "longValue", "()J", false);
+                break;
+            case "double":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Double");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Double", "doubleValue", "()D", false);
+                break;
+            case "float":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Float");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Float", "floatValue", "()F", false);
+                break;
+            case "boolean":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Boolean");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Boolean", "booleanValue", "()Z", false);
+                break;
+            case "byte":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Byte");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Byte", "byteValue", "()B", false);
+                break;
+            case "short":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Short");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Short", "shortValue", "()S", false);
+                break;
+            case "char":
+                mv.visitTypeInsn(CHECKCAST, "java/lang/Character");
+                mv.visitMethodInsn(INVOKEVIRTUAL, "java/lang/Character", "charValue", "()C", false);
+                break;
+            default:
+                // Object type - cast to target type
+                String typeInternal = typeName.replace('.', '/');
+                mv.visitTypeInsn(CHECKCAST, typeInternal);
+                break;
         }
     }
     

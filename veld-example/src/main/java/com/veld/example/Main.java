@@ -27,6 +27,12 @@ import com.veld.runtime.VeldContainer;
  *     - Environment-specific components (dev, prod, test)
  *     - Profile negation (!prod)
  *     - Multiple profiles with OR logic
+ * 15. @Value configuration injection (AppConfigService)
+ *     - System properties
+ *     - Environment variables
+ *     - application.properties file
+ *     - Default values
+ *     - Type conversion (String, int, boolean, double, etc.)
  * 
  * Simple API: Just create a new VeldContainer() - that's it!
  * All bytecode generation happens at compile-time using ASM.
@@ -96,7 +102,12 @@ public class Main {
             demonstrateProfiles(container);
             
             System.out.println("\n══════════════════════════════════════════════════════════");
-            System.out.println("11. SERVICE USAGE");
+            System.out.println("11. @VALUE CONFIGURATION INJECTION");
+            System.out.println("══════════════════════════════════════════════════════════");
+            demonstrateValueInjection(container);
+            
+            System.out.println("\n══════════════════════════════════════════════════════════");
+            System.out.println("12. SERVICE USAGE");
             System.out.println("══════════════════════════════════════════════════════════");
             demonstrateServiceUsage(container);
             
@@ -483,6 +494,47 @@ public class Main {
         System.out.println("  - Use @Profile(\"prod\") for production-only components");
         System.out.println("  - Use @Profile({\"dev\", \"test\"}) for multiple profiles (OR)");
         System.out.println("  - Use @Profile(\"!prod\") for negation (NOT prod)");
+    }
+    
+    /**
+     * Demonstrates @Value configuration injection.
+     */
+    private static void demonstrateValueInjection(VeldContainer container) {
+        System.out.println("\n→ @Value Configuration Injection Demo:");
+        System.out.println("  Values are resolved from multiple sources:");
+        System.out.println("  1. System properties (-Dproperty=value)");
+        System.out.println("  2. Environment variables");
+        System.out.println("  3. application.properties file");
+        System.out.println("  4. Default values in annotation");
+        
+        System.out.println("\n→ AppConfigService uses @Value for all configuration:");
+        AppConfigService appConfig = container.get(AppConfigService.class);
+        
+        System.out.println("\n→ Configuration Values Retrieved:");
+        System.out.println("  App Name: " + appConfig.getAppName());
+        System.out.println("  Version: " + appConfig.getAppVersion());
+        System.out.println("  Environment: " + appConfig.getEnvironment());
+        System.out.println("  Server Port: " + appConfig.getServerPort());
+        System.out.println("  Debug Mode: " + appConfig.isDebugMode());
+        System.out.println("  Max Connections: " + appConfig.getMaxConnections());
+        System.out.println("  Request Timeout: " + appConfig.getRequestTimeout() + "s");
+        System.out.println("  API URL: " + appConfig.getApiBaseUrl());
+        
+        System.out.println("\n→ Config Summary:");
+        System.out.println("  " + appConfig.getConfigSummary());
+        
+        System.out.println("\n→ @Value Annotation Examples:");
+        System.out.println("  @Value(\"${app.name:Veld Application}\")  - With default value");
+        System.out.println("  @Value(\"${server.port:8080}\")           - Integer conversion");
+        System.out.println("  @Value(\"${app.debug:false}\")            - Boolean conversion");
+        System.out.println("  @Value(\"${request.timeout:30.0}\")       - Double conversion");
+        
+        System.out.println("\n→ Override values with system properties:");
+        System.out.println("  java -Dserver.port=3000 -Dapp.environment=production ...");
+        
+        System.out.println("\n→ Override values with environment variables:");
+        System.out.println("  export SERVER_PORT=3000");
+        System.out.println("  export APP_ENVIRONMENT=production");
     }
     
     /**

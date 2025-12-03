@@ -55,20 +55,27 @@ public final class InjectionPoint {
         private final boolean isOptionalWrapper; // true if type is java.util.Optional<T>
         private final String actualTypeName;     // For Provider<T>/Optional<T>, the T type
         private final String actualTypeDescriptor; // For Provider<T>/Optional<T>, the T descriptor
+        private final String valueExpression;    // @Value expression, or null
         
         public Dependency(String typeName, String typeDescriptor, String qualifierName) {
-            this(typeName, typeDescriptor, qualifierName, false, false, false, false, typeName, typeDescriptor);
+            this(typeName, typeDescriptor, qualifierName, false, false, false, false, typeName, typeDescriptor, null);
         }
         
         public Dependency(String typeName, String typeDescriptor, String qualifierName,
                           boolean isProvider, boolean isLazy, 
                           String actualTypeName, String actualTypeDescriptor) {
-            this(typeName, typeDescriptor, qualifierName, isProvider, isLazy, false, false, actualTypeName, actualTypeDescriptor);
+            this(typeName, typeDescriptor, qualifierName, isProvider, isLazy, false, false, actualTypeName, actualTypeDescriptor, null);
         }
         
         public Dependency(String typeName, String typeDescriptor, String qualifierName,
                           boolean isProvider, boolean isLazy, boolean isOptional, boolean isOptionalWrapper,
                           String actualTypeName, String actualTypeDescriptor) {
+            this(typeName, typeDescriptor, qualifierName, isProvider, isLazy, isOptional, isOptionalWrapper, actualTypeName, actualTypeDescriptor, null);
+        }
+        
+        public Dependency(String typeName, String typeDescriptor, String qualifierName,
+                          boolean isProvider, boolean isLazy, boolean isOptional, boolean isOptionalWrapper,
+                          String actualTypeName, String actualTypeDescriptor, String valueExpression) {
             this.typeName = typeName;
             this.typeDescriptor = typeDescriptor;
             this.qualifierName = qualifierName;
@@ -78,6 +85,14 @@ public final class InjectionPoint {
             this.isOptionalWrapper = isOptionalWrapper;
             this.actualTypeName = actualTypeName;
             this.actualTypeDescriptor = actualTypeDescriptor;
+            this.valueExpression = valueExpression;
+        }
+        
+        /**
+         * Creates a @Value dependency.
+         */
+        public static Dependency forValue(String typeName, String typeDescriptor, String valueExpression) {
+            return new Dependency(typeName, typeDescriptor, null, false, false, false, false, typeName, typeDescriptor, valueExpression);
         }
         
         public String getTypeName() {
@@ -153,6 +168,20 @@ public final class InjectionPoint {
          */
         public boolean needsSpecialHandling() {
             return isProvider || isLazy || isOptional || isOptionalWrapper;
+        }
+        
+        /**
+         * Returns the @Value expression, or null if not a value injection.
+         */
+        public String getValueExpression() {
+            return valueExpression;
+        }
+        
+        /**
+         * Returns true if this is a @Value injection.
+         */
+        public boolean isValueInjection() {
+            return valueExpression != null;
         }
     }
 }

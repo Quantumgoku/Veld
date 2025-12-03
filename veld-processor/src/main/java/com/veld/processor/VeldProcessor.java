@@ -214,10 +214,10 @@ public class VeldProcessor extends AbstractProcessor {
             }
         }
         
-        // Add field dependencies (skip optional ones)
+        // Add field dependencies (skip optional ones and @Value injections)
         for (InjectionPoint field : info.getFieldInjections()) {
             for (InjectionPoint.Dependency dep : field.getDependencies()) {
-                if (!dep.allowsMissing()) {
+                if (!dep.allowsMissing() && !dep.isValueInjection()) {
                     dependencyGraph.addDependency(componentName, dep.getActualTypeName());
                 }
             }
@@ -469,6 +469,35 @@ public class VeldProcessor extends AbstractProcessor {
             if (enclosed.getKind() != ElementKind.FIELD) continue;
             
             VariableElement field = (VariableElement) enclosed;
+            
+            // Check for @Value annotation first
+            Value valueAnnotation = field.getAnnotation(Value.class);
+            if (valueAnnotation != null) {
+                if (field.getModifiers().contains(Modifier.FINAL)) {
+                    throw new ProcessingException("@Value cannot be applied to final fields: " + field.getSimpleName());
+                }
+                if (field.getModifiers().contains(Modifier.STATIC)) {
+                    throw new ProcessingException("@Value cannot be applied to static fields: " + field.getSimpleName());
+                }
+                if (field.getModifiers().contains(Modifier.PRIVATE)) {
+                    throw new ProcessingException("@Value cannot be applied to private fields (use package-private, protected, or public): " + field.getSimpleName());
+                }
+                
+                String typeName = getTypeName(field.asType());
+                String descriptor = getTypeDescriptor(field.asType());
+                String valueExpression = valueAnnotation.value();
+                
+                Dependency dep = Dependency.forValue(typeName, descriptor, valueExpression);
+                
+                note("  -> @Value(\"" + valueExpression + "\") for field: " + field.getSimpleName());
+                
+                info.addFieldInjection(new InjectionPoint(
+                        InjectionPoint.Type.FIELD,
+                        field.getSimpleName().toString(),
+                        descriptor,
+                        List.of(dep)));
+                continue;
+            }
             
             // Check for any @Inject annotation (Veld, javax.inject, or jakarta.inject)
             if (!AnnotationHelper.hasInjectAnnotation(field)) continue;
