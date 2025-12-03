@@ -1,10 +1,15 @@
 package com.veld.runtime;
 
+import com.veld.runtime.condition.ConditionContext;
+
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
@@ -30,6 +35,7 @@ public class VeldContainer {
     private static volatile MethodHandle createRegistryHandle;
     
     private final ComponentRegistry registry;
+    private final Set<String> activeProfiles;
     private final Map<String, Object> singletons = new ConcurrentHashMap<>();
     private volatile boolean closed = false;
 
@@ -40,10 +46,27 @@ public class VeldContainer {
      * Uses MethodHandle to invoke the generated bootstrap class, avoiding
      * traditional reflection APIs (Constructor.newInstance, etc.).
      * 
+     * Active profiles are resolved from:
+     * 1. System property: -Dveld.profiles.active=dev,test
+     * 2. Environment variable: VELD_PROFILES_ACTIVE=dev,test
+     * 3. Default profile "default" if none specified
+     * 
      * @throws VeldException if the registry cannot be loaded
      */
     public VeldContainer() {
-        this(loadGeneratedRegistry());
+        this((Set<String>) null);
+    }
+    
+    /**
+     * Creates a new container with the specified active profiles.
+     * 
+     * @param activeProfiles the profiles to activate (null to read from environment)
+     * @throws VeldException if the registry cannot be loaded
+     */
+    public VeldContainer(Set<String> activeProfiles) {
+        this.activeProfiles = activeProfiles;
+        this.registry = loadGeneratedRegistry(activeProfiles);
+        initializeSingletons();
     }
     
     /**
@@ -54,7 +77,48 @@ public class VeldContainer {
      */
     public VeldContainer(ComponentRegistry registry) {
         this.registry = registry;
+        this.activeProfiles = null;
         initializeSingletons();
+    }
+    
+    /**
+     * Creates a new container with the specified active profiles.
+     * 
+     * <p>Example usage:
+     * <pre>{@code
+     * VeldContainer container = VeldContainer.withProfiles("dev", "local");
+     * }</pre>
+     * 
+     * @param profiles the profiles to activate
+     * @return a new container with the specified profiles active
+     * @throws VeldException if the registry cannot be loaded
+     */
+    public static VeldContainer withProfiles(String... profiles) {
+        Set<String> profileSet = new HashSet<>(Arrays.asList(profiles));
+        return new VeldContainer(profileSet);
+    }
+    
+    /**
+     * Gets the active profiles for this container.
+     * 
+     * @return the set of active profile names
+     */
+    public Set<String> getActiveProfiles() {
+        if (activeProfiles != null) {
+            return new HashSet<>(activeProfiles);
+        }
+        // If null, profiles were resolved from environment
+        return new ConditionContext(getClass().getClassLoader()).getActiveProfiles();
+    }
+    
+    /**
+     * Checks if a specific profile is active.
+     * 
+     * @param profile the profile name to check
+     * @return true if the profile is active
+     */
+    public boolean isProfileActive(String profile) {
+        return getActiveProfiles().contains(profile);
     }
     
     /**
@@ -74,14 +138,17 @@ public class VeldContainer {
      * - @ConditionalOnProperty - checks system properties/env vars
      * - @ConditionalOnClass - checks classpath for required classes
      * - @ConditionalOnMissingBean - checks for absence of beans
+     * - @Profile - checks active profiles
+     * 
+     * @param activeProfiles the profiles to activate, or null to resolve from environment
      */
-    private static ComponentRegistry loadGeneratedRegistry() {
+    private static ComponentRegistry loadGeneratedRegistry(Set<String> activeProfiles) {
         try {
             MethodHandle handle = getCreateRegistryHandle();
             ComponentRegistry generatedRegistry = (ComponentRegistry) handle.invoke();
             
             // Wrap with ConditionalRegistry to evaluate conditions
-            return new ConditionalRegistry(generatedRegistry);
+            return new ConditionalRegistry(generatedRegistry, activeProfiles);
         } catch (VeldException e) {
             throw e;
         } catch (Throwable e) {

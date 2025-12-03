@@ -18,6 +18,9 @@ public final class ConditionInfo {
     // Missing bean conditions
     private final List<MissingBeanConditionInfo> missingBeanConditions = new ArrayList<>();
     
+    // Profile conditions
+    private final List<ProfileConditionInfo> profileConditions = new ArrayList<>();
+    
     /**
      * Adds a property condition.
      */
@@ -47,12 +50,20 @@ public final class ConditionInfo {
     }
     
     /**
+     * Adds a profile condition.
+     */
+    public void addProfileCondition(List<String> profiles) {
+        profileConditions.add(new ProfileConditionInfo(profiles));
+    }
+    
+    /**
      * Checks if any conditions are defined.
      */
     public boolean hasConditions() {
         return !propertyConditions.isEmpty() || 
                !classConditions.isEmpty() || 
-               !missingBeanConditions.isEmpty();
+               !missingBeanConditions.isEmpty() ||
+               !profileConditions.isEmpty();
     }
     
     public List<PropertyConditionInfo> getPropertyConditions() {
@@ -65,6 +76,10 @@ public final class ConditionInfo {
     
     public List<MissingBeanConditionInfo> getMissingBeanConditions() {
         return missingBeanConditions;
+    }
+    
+    public List<ProfileConditionInfo> getProfileConditions() {
+        return profileConditions;
     }
     
     /**
@@ -127,6 +142,21 @@ public final class ConditionInfo {
         
         public List<String> getBeanNames() {
             return beanNames;
+        }
+    }
+    
+    /**
+     * Profile condition info.
+     */
+    public static final class ProfileConditionInfo {
+        private final List<String> profiles;
+        
+        public ProfileConditionInfo(List<String> profiles) {
+            this.profiles = profiles;
+        }
+        
+        public List<String> getProfiles() {
+            return profiles;
         }
     }
 }

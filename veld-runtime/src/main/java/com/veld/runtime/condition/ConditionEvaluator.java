@@ -78,6 +78,16 @@ public final class ConditionEvaluator {
     }
     
     /**
+     * Adds a profile condition.
+     * 
+     * @param profiles the profiles that must be active (any one of them)
+     * @return this evaluator for chaining
+     */
+    public ConditionEvaluator addProfileCondition(String... profiles) {
+        return addCondition(new ProfileCondition(profiles));
+    }
+    
+    /**
      * Checks if all conditions are satisfied.
      * 
      * @param context the condition context

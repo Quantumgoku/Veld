@@ -619,6 +619,22 @@ public class VeldProcessor extends AbstractProcessor {
             }
         }
         
+        // Check for @Profile
+        Profile profileAnnotation = typeElement.getAnnotation(Profile.class);
+        if (profileAnnotation != null) {
+            List<String> profiles = new ArrayList<>();
+            for (String profile : profileAnnotation.value()) {
+                if (!profile.isEmpty()) {
+                    profiles.add(profile);
+                }
+            }
+            
+            if (!profiles.isEmpty()) {
+                conditionInfo.addProfileCondition(profiles);
+                note("  -> Profile: " + String.join(", ", profiles));
+            }
+        }
+        
         if (conditionInfo.hasConditions()) {
             info.setConditionInfo(conditionInfo);
         }

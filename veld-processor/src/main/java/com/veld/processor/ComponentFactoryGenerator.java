@@ -517,6 +517,26 @@ public final class ComponentFactoryGenerator {
             }
         }
         
+        // Add profile conditions
+        for (ConditionInfo.ProfileConditionInfo profile : conditions.getProfileConditions()) {
+            mv.visitVarInsn(ALOAD, 1);
+            // Create String[] array with profile names
+            int size = profile.getProfiles().size();
+            mv.visitIntInsn(BIPUSH, size);
+            mv.visitTypeInsn(ANEWARRAY, STRING);
+            
+            for (int i = 0; i < size; i++) {
+                mv.visitInsn(DUP);
+                mv.visitIntInsn(BIPUSH, i);
+                mv.visitLdcInsn(profile.getProfiles().get(i));
+                mv.visitInsn(AASTORE);
+            }
+            
+            mv.visitMethodInsn(INVOKEVIRTUAL, CONDITION_EVALUATOR, "addProfileCondition",
+                    "([L" + STRING + ";)L" + CONDITION_EVALUATOR + ";", false);
+            mv.visitInsn(POP);
+        }
+        
         // return evaluator;
         mv.visitVarInsn(ALOAD, 1);
         mv.visitInsn(ARETURN);

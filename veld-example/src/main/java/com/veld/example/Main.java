@@ -23,6 +23,10 @@ import com.veld.runtime.VeldContainer;
  *     - @ConditionalOnProperty
  *     - @ConditionalOnClass
  *     - @ConditionalOnMissingBean
+ * 14. @Profile annotations (ProfileDemoService)
+ *     - Environment-specific components (dev, prod, test)
+ *     - Profile negation (!prod)
+ *     - Multiple profiles with OR logic
  * 
  * Simple API: Just create a new VeldContainer() - that's it!
  * All bytecode generation happens at compile-time using ASM.
@@ -87,7 +91,12 @@ public class Main {
             demonstrateConditional(container);
             
             System.out.println("\n══════════════════════════════════════════════════════════");
-            System.out.println("10. SERVICE USAGE");
+            System.out.println("10. @PROFILE ANNOTATIONS");
+            System.out.println("══════════════════════════════════════════════════════════");
+            demonstrateProfiles(container);
+            
+            System.out.println("\n══════════════════════════════════════════════════════════");
+            System.out.println("11. SERVICE USAGE");
             System.out.println("══════════════════════════════════════════════════════════");
             demonstrateServiceUsage(container);
             
@@ -410,6 +419,70 @@ public class Main {
         
         System.out.println("\n→ Summary: @Conditional annotations enable auto-configuration");
         System.out.println("  by registering beans only when specific conditions are met.");
+    }
+    
+    /**
+     * Demonstrates @Profile annotations for environment-specific components.
+     */
+    private static void demonstrateProfiles(VeldContainer container) {
+        System.out.println("\n→ Profile-Based Component Registration Demo:");
+        System.out.println("  Components can be registered based on active profiles.");
+        
+        // Show active profiles
+        System.out.println("\n→ Active Profiles:");
+        java.util.Set<String> profiles = container.getActiveProfiles();
+        System.out.println("  " + profiles);
+        
+        // Explain how to activate profiles
+        System.out.println("\n→ How to activate profiles:");
+        System.out.println("  1. System property: -Dveld.profiles.active=dev");
+        System.out.println("  2. Environment variable: VELD_PROFILES_ACTIVE=dev");
+        System.out.println("  3. Programmatically: VeldContainer.withProfiles(\"dev\")");
+        
+        // Check which profile-specific components are available
+        System.out.println("\n→ Profile-Specific Components Status:");
+        
+        // DataSource implementations
+        boolean hasDevDs = container.contains(DevDataSource.class);
+        boolean hasProdDs = container.contains(ProdDataSource.class);
+        boolean hasTestDs = container.contains(TestDataSource.class);
+        
+        System.out.println("  DevDataSource (@Profile(\"dev\")): " + (hasDevDs ? "REGISTERED" : "excluded"));
+        System.out.println("  ProdDataSource (@Profile(\"prod\")): " + (hasProdDs ? "REGISTERED" : "excluded"));
+        System.out.println("  TestDataSource (@Profile(\"test\")): " + (hasTestDs ? "REGISTERED" : "excluded"));
+        
+        // VerboseLoggingService
+        boolean hasVerboseLog = container.contains(VerboseLoggingService.class);
+        System.out.println("  VerboseLoggingService (@Profile({\"dev\", \"test\"})): " + 
+                          (hasVerboseLog ? "REGISTERED" : "excluded"));
+        
+        // MockPaymentGateway
+        boolean hasMockPayment = container.contains(MockPaymentGateway.class);
+        System.out.println("  MockPaymentGateway (@Profile(\"!prod\")): " + 
+                          (hasMockPayment ? "REGISTERED" : "excluded"));
+        
+        // Check DataSource interface availability
+        System.out.println("\n→ DataSource Interface Resolution:");
+        boolean hasDataSource = container.contains(DataSource.class);
+        if (hasDataSource) {
+            DataSource ds = container.get(DataSource.class);
+            System.out.println("  DataSource implementation: " + ds.getClass().getSimpleName());
+            System.out.println("  Connection URL: " + ds.getConnectionUrl());
+        } else {
+            System.out.println("  No DataSource available for current profile");
+            System.out.println("  Hint: Try running with -Dveld.profiles.active=dev");
+        }
+        
+        // ProfileDemoService demonstration
+        System.out.println("\n→ ProfileDemoService integrates with profile-specific beans:");
+        ProfileDemoService profileDemo = container.get(ProfileDemoService.class);
+        profileDemo.runAllDemos();
+        
+        System.out.println("\n→ Summary: @Profile enables environment-specific configuration.");
+        System.out.println("  - Use @Profile(\"dev\") for development-only components");
+        System.out.println("  - Use @Profile(\"prod\") for production-only components");
+        System.out.println("  - Use @Profile({\"dev\", \"test\"}) for multiple profiles (OR)");
+        System.out.println("  - Use @Profile(\"!prod\") for negation (NOT prod)");
     }
     
     /**

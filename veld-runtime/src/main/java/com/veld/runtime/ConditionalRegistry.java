@@ -39,7 +39,19 @@ public final class ConditionalRegistry implements ComponentRegistry {
      * @param originalRegistry the generated registry with all components
      */
     public ConditionalRegistry(ComponentRegistry originalRegistry) {
-        this(originalRegistry, Thread.currentThread().getContextClassLoader());
+        this(originalRegistry, (Set<String>) null);
+    }
+    
+    /**
+     * Creates a conditional registry with specific active profiles.
+     * 
+     * @param originalRegistry the generated registry with all components
+     * @param activeProfiles the profiles to activate, or null to resolve from environment
+     */
+    public ConditionalRegistry(ComponentRegistry originalRegistry, Set<String> activeProfiles) {
+        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+        this.conditionContext = new ConditionContext(classLoader, activeProfiles);
+        evaluateAndRegister(originalRegistry.getAllFactories());
     }
     
     /**
@@ -49,7 +61,7 @@ public final class ConditionalRegistry implements ComponentRegistry {
      * @param classLoader the class loader for class presence checks
      */
     public ConditionalRegistry(ComponentRegistry originalRegistry, ClassLoader classLoader) {
-        this.conditionContext = new ConditionContext(classLoader);
+        this.conditionContext = new ConditionContext(classLoader, null);
         evaluateAndRegister(originalRegistry.getAllFactories());
     }
     
