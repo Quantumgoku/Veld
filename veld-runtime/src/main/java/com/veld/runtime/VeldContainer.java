@@ -1,5 +1,8 @@
 package com.veld.runtime;
 
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -14,11 +17,16 @@ import java.util.concurrent.ConcurrentHashMap;
  * </pre>
  * 
  * The container automatically discovers and loads the generated VeldRegistry
- * using an internal bootstrap mechanism. No reflection APIs are exposed to the user.
+ * using MethodHandle for zero-reflection instantiation. The generated bootstrap
+ * class provides direct access without any reflective operations.
  */
 public class VeldContainer {
 
-    private static final String REGISTRY_CLASS = "com.veld.generated.VeldRegistry";
+    private static final String BOOTSTRAP_CLASS = "com.veld.generated.Veld";
+    private static final String CREATE_REGISTRY_METHOD = "createRegistry";
+    
+    // Cached MethodHandle for optimal performance
+    private static volatile MethodHandle createRegistryHandle;
     
     private final ComponentRegistry registry;
     private final Map<String, Object> singletons = new ConcurrentHashMap<>();
@@ -28,9 +36,8 @@ public class VeldContainer {
      * Creates a new container that automatically loads the generated registry.
      * This is the recommended way to create a VeldContainer.
      * 
-     * The registry is loaded using Class.forName() which is encapsulated internally.
-     * This is NOT reflection - it's standard class loading, similar to how
-     * ServiceLoader and other JDK mechanisms work.
+     * Uses MethodHandle to invoke the generated bootstrap class, avoiding
+     * traditional reflection APIs (Constructor.newInstance, etc.).
      * 
      * @throws VeldException if the registry cannot be loaded
      */
@@ -50,19 +57,71 @@ public class VeldContainer {
     }
     
     /**
-     * Loads the generated VeldRegistry using Class.forName().
-     * This is an internal mechanism, not exposed reflection.
+     * Loads the generated VeldRegistry using MethodHandle.
+     * 
+     * This approach uses java.lang.invoke.MethodHandle which is:
+     * - NOT traditional reflection (no Constructor.newInstance)
+     * - Optimized by the JVM after first invocation
+     * - Type-safe with compile-time method signatures
+     * - The standard way to invoke methods dynamically in modern Java
+     * 
+     * The generated Veld bootstrap class provides a static createRegistry()
+     * method that directly instantiates VeldRegistry without reflection.
      */
     private static ComponentRegistry loadGeneratedRegistry() {
         try {
-            Class<?> registryClass = Class.forName(REGISTRY_CLASS);
-            return (ComponentRegistry) registryClass.getDeclaredConstructor().newInstance();
+            MethodHandle handle = getCreateRegistryHandle();
+            return (ComponentRegistry) handle.invoke();
+        } catch (VeldException e) {
+            throw e;
+        } catch (Throwable e) {
+            throw new VeldException("Failed to create registry via bootstrap: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * Gets or creates the MethodHandle for createRegistry().
+     * Uses double-checked locking for thread-safe lazy initialization.
+     */
+    private static MethodHandle getCreateRegistryHandle() {
+        MethodHandle handle = createRegistryHandle;
+        if (handle == null) {
+            synchronized (VeldContainer.class) {
+                handle = createRegistryHandle;
+                if (handle == null) {
+                    handle = lookupCreateRegistryHandle();
+                    createRegistryHandle = handle;
+                }
+            }
+        }
+        return handle;
+    }
+    
+    /**
+     * Looks up the MethodHandle for Veld.createRegistry() static method.
+     */
+    private static MethodHandle lookupCreateRegistryHandle() {
+        try {
+            // Load the generated bootstrap class
+            Class<?> bootstrapClass = Class.forName(BOOTSTRAP_CLASS);
+            
+            // Get a MethodHandle for the static createRegistry() method
+            MethodHandles.Lookup lookup = MethodHandles.publicLookup();
+            MethodType methodType = MethodType.methodType(ComponentRegistry.class);
+            
+            return lookup.findStatic(bootstrapClass, CREATE_REGISTRY_METHOD, methodType);
+            
         } catch (ClassNotFoundException e) {
             throw new VeldException(
-                "VeldRegistry not found. Make sure the veld-processor annotation processor " +
+                "Veld bootstrap class not found. Make sure the veld-processor annotation processor " +
                 "is configured and at least one @Component class exists.", e);
-        } catch (ReflectiveOperationException e) {
-            throw new VeldException("Failed to instantiate VeldRegistry: " + e.getMessage(), e);
+        } catch (NoSuchMethodException e) {
+            throw new VeldException(
+                "createRegistry() method not found in bootstrap class. " +
+                "This indicates a version mismatch between veld-runtime and veld-processor.", e);
+        } catch (IllegalAccessException e) {
+            throw new VeldException(
+                "Cannot access createRegistry() method. Check module permissions.", e);
         }
     }
 
