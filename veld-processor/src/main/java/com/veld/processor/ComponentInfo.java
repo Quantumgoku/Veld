@@ -3,6 +3,7 @@ package com.veld.processor;
 import com.veld.runtime.Scope;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * Holds all metadata about a component discovered during annotation processing.
@@ -144,7 +145,7 @@ public final class ComponentInfo {
     public List<String> getImplementedInterfacesInternal() {
         return implementedInterfaces.stream()
                 .map(name -> name.replace('.', '/'))
-                .toList();
+                .collect(Collectors.toList());
     }
     
     /**
