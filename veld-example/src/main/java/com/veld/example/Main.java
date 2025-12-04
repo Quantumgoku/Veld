@@ -1,7 +1,12 @@
 package com.veld.example;
 
+import com.veld.example.events.NotificationEvent;
+import com.veld.example.events.OrderCreatedEvent;
 import com.veld.runtime.Provider;
 import com.veld.runtime.VeldContainer;
+import com.veld.runtime.event.EventBus;
+
+import java.util.Arrays;
 
 /**
  * Main class demonstrating Veld DI framework capabilities.
@@ -33,6 +38,12 @@ import com.veld.runtime.VeldContainer;
  *     - application.properties file
  *     - Default values
  *     - Type conversion (String, int, boolean, double, etc.)
+ * 16. EventBus - Event-driven communication
+ *     - @Subscribe annotation for event handlers
+ *     - Sync and async event delivery
+ *     - Priority-based ordering
+ *     - Filter expressions
+ *     - Event hierarchy support
  * 
  * Simple API: Just create a new VeldContainer() - that's it!
  * All bytecode generation happens at compile-time using ASM.
@@ -107,7 +118,12 @@ public class Main {
             demonstrateValueInjection(container);
             
             System.out.println("\n══════════════════════════════════════════════════════════");
-            System.out.println("12. SERVICE USAGE");
+            System.out.println("12. EVENTBUS - EVENT-DRIVEN COMMUNICATION");
+            System.out.println("══════════════════════════════════════════════════════════");
+            demonstrateEventBus(container);
+            
+            System.out.println("\n══════════════════════════════════════════════════════════");
+            System.out.println("13. SERVICE USAGE");
             System.out.println("══════════════════════════════════════════════════════════");
             demonstrateServiceUsage(container);
             
@@ -535,6 +551,97 @@ public class Main {
         System.out.println("\n→ Override values with environment variables:");
         System.out.println("  export SERVER_PORT=3000");
         System.out.println("  export APP_ENVIRONMENT=production");
+    }
+    
+    /**
+     * Demonstrates EventBus for event-driven communication.
+     */
+    private static void demonstrateEventBus(VeldContainer container) {
+        System.out.println("\n→ EventBus - Decoupled component communication");
+        System.out.println("  Components publish events without knowing who handles them.");
+        System.out.println("  Subscribers receive events using @Subscribe annotation.\n");
+        
+        // Get the EventBus and register handlers
+        EventBus eventBus = EventBus.getInstance();
+        
+        // Get handler components and register them
+        System.out.println("→ Registering event handlers:");
+        OrderEventHandler orderHandler = container.get(OrderEventHandler.class);
+        NotificationHandler notificationHandler = container.get(NotificationHandler.class);
+        
+        eventBus.register(orderHandler);
+        eventBus.register(notificationHandler);
+        
+        // Get the demo service that publishes events
+        EventDemoService eventService = container.get(EventDemoService.class);
+        
+        // Demonstrate creating orders
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Publishing OrderCreatedEvent (regular order):");
+        System.out.println("══════════════════════════════════════════════════════════");
+        eventService.createOrder(
+            299.99,
+            "customer@example.com",
+            Arrays.asList("Veld Framework License", "Premium Support"),
+            "123 Main St, Tech City"
+        );
+        
+        // Wait for async handlers
+        try { Thread.sleep(200); } catch (InterruptedException e) { }
+        
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Publishing OrderCreatedEvent (VIP order > $1000):");
+        System.out.println("══════════════════════════════════════════════════════════");
+        eventService.createOrder(
+            2499.99,
+            "vip@enterprise.com",
+            Arrays.asList("Enterprise License", "24/7 Support", "Custom Training"),
+            "456 Corporate Blvd"
+        );
+        
+        // Wait for async handlers
+        try { Thread.sleep(200); } catch (InterruptedException e) { }
+        
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Publishing OrderCancelledEvent:");
+        System.out.println("══════════════════════════════════════════════════════════");
+        eventService.cancelOrder(
+            "ORD-1001",
+            299.99,
+            "customer@example.com",
+            "Customer requested cancellation",
+            true
+        );
+        
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Publishing NotificationEvent (normal priority):");
+        System.out.println("══════════════════════════════════════════════════════════");
+        eventService.sendNotification(
+            "System maintenance scheduled for tonight",
+            NotificationEvent.Priority.NORMAL,
+            "system"
+        );
+        
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Publishing NotificationEvent (URGENT priority):");
+        System.out.println("══════════════════════════════════════════════════════════");
+        eventService.sendNotification(
+            "Critical security update required!",
+            NotificationEvent.Priority.URGENT,
+            "security"
+        );
+        
+        // Show statistics
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ EventBus Statistics:");
+        System.out.println("══════════════════════════════════════════════════════════");
+        System.out.println(eventBus.getStatistics());
+        
+        System.out.println("\n→ @Subscribe Features Demonstrated:");
+        System.out.println("  - priority: Higher priority handlers run first");
+        System.out.println("  - async=true: Handler runs in background thread");
+        System.out.println("  - filter: Conditional handling (e.g., amount > 1000)");
+        System.out.println("  - Event hierarchy: OrderEvent base class catches all order events");
     }
     
     /**
