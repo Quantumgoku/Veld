@@ -15,7 +15,7 @@
  */
 package com.veld.runtime.lifecycle.event;
 
-import java.time.Instant;
+import com.veld.runtime.event.Event;
 
 /**
  * Base class for all container context lifecycle events.
@@ -23,6 +23,8 @@ import java.time.Instant;
  * <p>Context events are published to the EventBus during the container
  * lifecycle. Components can subscribe to these events using the
  * {@code @Subscribe} annotation.
+ *
+ * <p>Extends {@link Event} to integrate with the Veld EventBus system.
  *
  * <h2>Event Types</h2>
  * <ul>
@@ -52,11 +54,9 @@ import java.time.Instant;
  *
  * @author Veld Framework
  * @since 1.0.0-alpha.6
+ * @see Event
  */
-public abstract class ContextEvent {
-    
-    private final Object source;
-    private final Instant timestamp;
+public abstract class ContextEvent extends Event {
     
     /**
      * Creates a new context event.
@@ -64,33 +64,14 @@ public abstract class ContextEvent {
      * @param source the source of the event (typically the container)
      */
     protected ContextEvent(Object source) {
-        this.source = source;
-        this.timestamp = Instant.now();
-    }
-    
-    /**
-     * Returns the source of this event.
-     *
-     * @return the event source
-     */
-    public Object getSource() {
-        return source;
-    }
-    
-    /**
-     * Returns the timestamp when this event was created.
-     *
-     * @return the event timestamp
-     */
-    public Instant getTimestamp() {
-        return timestamp;
+        super(source);
     }
     
     @Override
     public String toString() {
         return getClass().getSimpleName() + "{" +
-                "source=" + source.getClass().getSimpleName() +
-                ", timestamp=" + timestamp +
+                "source=" + (getSource() != null ? getSource().getClass().getSimpleName() : "null") +
+                ", timestamp=" + getTimestamp() +
                 '}';
     }
 }

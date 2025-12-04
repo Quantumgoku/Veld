@@ -253,7 +253,7 @@ public class LifecycleProcessor {
         
         // Publish event
         if (eventBus != null) {
-            eventBus.post(new ContextRefreshedEvent(this, managedBeans.size(), initializationTimeMs));
+            eventBus.publish(new ContextRefreshedEvent(this, managedBeans.size(), initializationTimeMs));
         }
         
         LOGGER.info("Container refreshed with " + managedBeans.size() + " beans in " + 
@@ -320,7 +320,7 @@ public class LifecycleProcessor {
         
         // Publish event
         if (eventBus != null) {
-            eventBus.post(new ContextStartedEvent(this, lifecycleCount));
+            eventBus.publish(new ContextStartedEvent(this, lifecycleCount));
         }
         
         LOGGER.info("Lifecycle started: " + lifecycleCount + " beans");
@@ -387,7 +387,7 @@ public class LifecycleProcessor {
         
         // Publish event
         if (eventBus != null) {
-            eventBus.post(new ContextStoppedEvent(this, lifecycleCount));
+            eventBus.publish(new ContextStoppedEvent(this, lifecycleCount));
         }
         
         LOGGER.info("Lifecycle stopped: " + lifecycleCount + " beans");
@@ -426,7 +426,7 @@ public class LifecycleProcessor {
         
         // Publish event
         if (eventBus != null) {
-            eventBus.post(new ContextClosedEvent(this, uptime, destroyedCount));
+            eventBus.publish(new ContextClosedEvent(this, uptime, destroyedCount));
         }
         
         LOGGER.info("Container closed: " + destroyedCount + " beans destroyed, uptime: " + uptime);
