@@ -1,7 +1,17 @@
 package com.veld.example;
 
+import com.veld.example.aop.CalculatorService;
+import com.veld.example.aop.LoggingAspect;
+import com.veld.example.aop.PerformanceAspect;
+import com.veld.example.aop.ProductService;
 import com.veld.example.events.NotificationEvent;
 import com.veld.example.events.OrderCreatedEvent;
+import com.veld.aop.InterceptorRegistry;
+import com.veld.aop.interceptor.LoggingInterceptor;
+import com.veld.aop.interceptor.TimingInterceptor;
+import com.veld.aop.interceptor.TransactionInterceptor;
+import com.veld.aop.interceptor.ValidationInterceptor;
+import com.veld.aop.proxy.ProxyFactory;
 import com.veld.runtime.Provider;
 import com.veld.runtime.VeldContainer;
 import com.veld.runtime.event.EventBus;
@@ -44,6 +54,13 @@ import java.util.Arrays;
  *     - Priority-based ordering
  *     - Filter expressions
  *     - Event hierarchy support
+ * 17. AOP (Aspect-Oriented Programming)
+ *     - @Aspect for defining aspects
+ *     - @Around, @Before, @After advice
+ *     - Pointcut expressions with wildcards
+ *     - @Interceptor and @AroundInvoke
+ *     - Built-in interceptors: @Logged, @Timed, @Validated, @Transactional
+ *     - ASM bytecode proxy generation
  * 
  * Simple API: Just create a new VeldContainer() - that's it!
  * All bytecode generation happens at compile-time using ASM.
@@ -123,7 +140,12 @@ public class Main {
             demonstrateEventBus(container);
             
             System.out.println("\n══════════════════════════════════════════════════════════");
-            System.out.println("13. SERVICE USAGE");
+            System.out.println("13. AOP (ASPECT-ORIENTED PROGRAMMING)");
+            System.out.println("══════════════════════════════════════════════════════════");
+            demonstrateAop();
+            
+            System.out.println("\n══════════════════════════════════════════════════════════");
+            System.out.println("14. SERVICE USAGE");
             System.out.println("══════════════════════════════════════════════════════════");
             demonstrateServiceUsage(container);
             
@@ -642,6 +664,122 @@ public class Main {
         System.out.println("  - async=true: Handler runs in background thread");
         System.out.println("  - filter: Conditional handling (e.g., amount > 1000)");
         System.out.println("  - Event hierarchy: OrderEvent base class catches all order events");
+    }
+    
+    /**
+     * Demonstrates AOP (Aspect-Oriented Programming) features.
+     */
+    private static void demonstrateAop() {
+        System.out.println("\n→ AOP - Aspect-Oriented Programming Demo");
+        System.out.println("  Cross-cutting concerns handled declaratively.");
+        System.out.println("  Aspects intercept method calls using pointcut expressions.");
+        
+        // Register aspects
+        System.out.println("\n→ Registering Aspects:");
+        InterceptorRegistry registry = InterceptorRegistry.getInstance();
+        
+        LoggingAspect loggingAspect = new LoggingAspect();
+        PerformanceAspect performanceAspect = new PerformanceAspect();
+        registry.registerAspect(loggingAspect);
+        registry.registerAspect(performanceAspect);
+        
+        // Register built-in interceptors
+        System.out.println("\n→ Registering Built-in Interceptors:");
+        LoggingInterceptor loggingInterceptor = new LoggingInterceptor();
+        TimingInterceptor timingInterceptor = new TimingInterceptor();
+        ValidationInterceptor validationInterceptor = new ValidationInterceptor();
+        TransactionInterceptor transactionInterceptor = new TransactionInterceptor();
+        
+        registry.registerInterceptor(loggingInterceptor);
+        registry.registerInterceptor(timingInterceptor);
+        registry.registerInterceptor(validationInterceptor);
+        registry.registerInterceptor(transactionInterceptor);
+        
+        // Create proxied services
+        System.out.println("\n→ Creating AOP Proxies:");
+        ProxyFactory proxyFactory = ProxyFactory.getInstance();
+        
+        CalculatorService calculator = proxyFactory.createProxy(CalculatorService.class);
+        ProductService productService = proxyFactory.createProxy(ProductService.class);
+        
+        // Test CalculatorService (intercepted by LoggingAspect and PerformanceAspect)
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Testing CalculatorService (with @Around advice):");
+        System.out.println("══════════════════════════════════════════════════════════");
+        
+        System.out.println("\n>>> Calling add(5, 3):");
+        int sum = calculator.add(5, 3);
+        System.out.println("Result: " + sum);
+        
+        System.out.println("\n>>> Calling multiply(7, 6):");
+        int product = calculator.multiply(7, 6);
+        System.out.println("Result: " + product);
+        
+        System.out.println("\n>>> Calling factorial(5):");
+        long factorial = calculator.factorial(5);
+        System.out.println("Result: " + factorial);
+        
+        System.out.println("\n>>> Calling divide(10, 0) - should throw exception:");
+        try {
+            calculator.divide(10, 0);
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            System.out.println("Caught exception as expected: " + cause.getMessage());
+        }
+        
+        // Test ProductService (intercepted by @Before, @After advice + @Transactional, @Logged)
+        System.out.println("\n══════════════════════════════════════════════════════════");
+        System.out.println("→ Testing ProductService (with @Before, @After, @Transactional):");
+        System.out.println("══════════════════════════════════════════════════════════");
+        
+        System.out.println("\n>>> Creating products:");
+        ProductService.Product p1 = productService.createProduct("VELD-001", "Veld Framework", 99.99);
+        System.out.println("Created: " + p1);
+        
+        ProductService.Product p2 = productService.createProduct("VELD-002", "Veld Enterprise", 499.99);
+        System.out.println("Created: " + p2);
+        
+        System.out.println("\n>>> Finding product:");
+        ProductService.Product found = productService.findProduct("VELD-001");
+        System.out.println("Found: " + found);
+        
+        System.out.println("\n>>> Updating price:");
+        ProductService.Product updated = productService.updatePrice("VELD-001", 79.99);
+        System.out.println("Updated: " + updated);
+        
+        System.out.println("\n>>> Deleting product:");
+        boolean deleted = productService.deleteProduct("VELD-002");
+        System.out.println("Deleted: " + deleted);
+        
+        System.out.println("\n>>> Finding non-existent product (should throw):");
+        try {
+            productService.findProduct("VELD-999");
+        } catch (Exception e) {
+            Throwable cause = e.getCause() != null ? e.getCause() : e;
+            System.out.println("Caught exception as expected: " + cause.getMessage());
+        }
+        
+        // Print performance statistics
+        PerformanceAspect.printStatistics();
+        
+        // Show registry statistics
+        System.out.println("→ InterceptorRegistry Statistics:");
+        System.out.println("  " + registry.getStatistics());
+        
+        System.out.println("\n→ AOP Features Demonstrated:");
+        System.out.println("  - @Aspect: LoggingAspect, PerformanceAspect");
+        System.out.println("  - @Around: Wraps method execution with before/after logic");
+        System.out.println("  - @Before: Executes before target method");
+        System.out.println("  - @After: Executes after target method (returning/throwing/finally)");
+        System.out.println("  - Pointcut expressions: execution(* com.veld.example.aop.*.*(..))");
+        System.out.println("  - @Interceptor + @AroundInvoke: CDI-style interception");
+        System.out.println("  - @Logged, @Timed, @Validated, @Transactional: Built-in interceptors");
+        System.out.println("  - ProxyFactory: ASM-based bytecode generation for proxies");
+        
+        // Clear statistics for next run
+        PerformanceAspect.clearStatistics();
+        TimingInterceptor.clearStatistics();
+        registry.clear();
     }
     
     /**

@@ -38,6 +38,7 @@
     <modules>
         <module>veld-annotations</module>
         <module>veld-runtime</module>
+        <module>veld-aop</module>
         <module>veld-processor</module>
         <module>veld-example</module>
     </modules>
@@ -82,6 +83,11 @@
             <dependency>
                 <groupId>com.veld</groupId>
                 <artifactId>veld-runtime</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.veld</groupId>
+                <artifactId>veld-aop</artifactId>
                 <version>${project.version}</version>
             </dependency>
 

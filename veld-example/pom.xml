@@ -29,6 +29,13 @@
             <version>${project.version}</version>
         </dependency>
 
+        <!-- Veld AOP -->
+        <dependency>
+            <groupId>com.veld</groupId>
+            <artifactId>veld-aop</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+
         <!-- Veld Processor (compile-time only) -->
         <dependency>
             <groupId>com.veld</groupId>
