@@ -40,6 +40,13 @@ A lightweight, compile-time Dependency Injection framework for Java using pure A
 - **CDI Interceptors**: `@Interceptor`, `@AroundInvoke`, `@InterceptorBinding`
 - **Built-in Interceptors**: Logging, Timing, Validation, Transactions
 
+### Advanced Lifecycle Management
+- **Lifecycle Interfaces**: `Lifecycle`, `SmartLifecycle` with phase ordering
+- **Bean Callbacks**: `InitializingBean`, `DisposableBean`
+- **Post-Processing**: `BeanPostProcessor` for custom bean modification
+- **Lifecycle Annotations**: `@PostInitialize`, `@OnStart`, `@OnStop`, `@DependsOn`
+- **Lifecycle Events**: `ContextRefreshedEvent`, `ContextStartedEvent`, `ContextStoppedEvent`, `ContextClosedEvent`
+
 ## Quick Start
 
 ### 1. Add Dependencies
@@ -50,28 +57,28 @@ A lightweight, compile-time Dependency Injection framework for Java using pure A
     <dependency>
         <groupId>com.veld</groupId>
         <artifactId>veld-annotations</artifactId>
-        <version>1.0.0-alpha.5</version>
+        <version>1.0.0-alpha.6</version>
     </dependency>
     
     <!-- Veld Runtime -->
     <dependency>
         <groupId>com.veld</groupId>
         <artifactId>veld-runtime</artifactId>
-        <version>1.0.0-alpha.5</version>
+        <version>1.0.0-alpha.6</version>
     </dependency>
     
     <!-- Veld AOP (optional) -->
     <dependency>
         <groupId>com.veld</groupId>
         <artifactId>veld-aop</artifactId>
-        <version>1.0.0-alpha.5</version>
+        <version>1.0.0-alpha.6</version>
     </dependency>
     
     <!-- Veld Processor (compile-time only) -->
     <dependency>
         <groupId>com.veld</groupId>
         <artifactId>veld-processor</artifactId>
-        <version>1.0.0-alpha.5</version>
+        <version>1.0.0-alpha.6</version>
         <scope>provided</scope>
     </dependency>
 </dependencies>
@@ -93,7 +100,7 @@ A lightweight, compile-time Dependency Injection framework for Java using pure A
                     <path>
                         <groupId>com.veld</groupId>
                         <artifactId>veld-processor</artifactId>
-                        <version>1.0.0-alpha.5</version>
+                        <version>1.0.0-alpha.6</version>
                     </path>
                 </annotationProcessorPaths>
             </configuration>
@@ -481,6 +488,162 @@ Undelivered events are wrapped in `DeadEvent`:
 public void onDeadEvent(DeadEvent event) {
     System.out.println("Unhandled event: " + event.getOriginalEvent());
 }
+```
+
+## Advanced Lifecycle Management
+
+Veld provides comprehensive lifecycle management for your beans:
+
+### Lifecycle Interfaces
+
+```java
+import com.veld.runtime.lifecycle.*;
+
+// SmartLifecycle with phase ordering
+@Singleton
+public class DatabaseConnection implements SmartLifecycle {
+    
+    private boolean running = false;
+    
+    @Override
+    public void start() {
+        // Connect to database
+        running = true;
+    }
+    
+    @Override
+    public void stop() {
+        // Close connections
+        running = false;
+    }
+    
+    @Override
+    public boolean isRunning() {
+        return running;
+    }
+    
+    @Override
+    public int getPhase() {
+        // Lower values start first, stop last
+        return -1000;
+    }
+    
+    @Override
+    public boolean isAutoStartup() {
+        return true;
+    }
+}
+```
+
+### InitializingBean & DisposableBean
+
+```java
+@Singleton
+public class MetricsService implements InitializingBean, DisposableBean {
+    
+    @Override
+    public void afterPropertiesSet() throws Exception {
+        // Called after all dependencies are injected
+        initializeMetrics();
+    }
+    
+    @Override
+    public void destroy() throws Exception {
+        // Called when container is closing
+        flushMetrics();
+    }
+}
+```
+
+### Lifecycle Annotations
+
+```java
+@Singleton
+@DependsOn("databaseConnection")
+public class CacheService {
+    
+    @PostInitialize
+    public void warmCache() {
+        // Called after ALL beans are initialized
+    }
+    
+    @OnStart
+    public void startCacheRefresh() {
+        // Called when context starts
+    }
+    
+    @OnStop
+    public void stopCacheRefresh() {
+        // Called when context stops
+    }
+}
+```
+
+### BeanPostProcessor
+
+```java
+public class LoggingBeanPostProcessor implements BeanPostProcessor {
+    
+    @Override
+    public Object postProcessBeforeInitialization(Object bean, String beanName) {
+        System.out.println("Before init: " + beanName);
+        return bean;
+    }
+    
+    @Override
+    public Object postProcessAfterInitialization(Object bean, String beanName) {
+        System.out.println("After init: " + beanName);
+        // Can return a proxy wrapper here
+        return bean;
+    }
+}
+```
+
+### Lifecycle Events
+
+```java
+@Singleton
+public class LifecycleMonitor {
+    
+    @Subscribe
+    public void onRefreshed(ContextRefreshedEvent event) {
+        System.out.println("Container initialized with " + event.getBeanCount() + " beans");
+    }
+    
+    @Subscribe
+    public void onStarted(ContextStartedEvent event) {
+        System.out.println("Application started");
+    }
+    
+    @Subscribe
+    public void onStopped(ContextStoppedEvent event) {
+        System.out.println("Application stopped");
+    }
+    
+    @Subscribe
+    public void onClosed(ContextClosedEvent event) {
+        System.out.println("Container closed after " + event.getUptime());
+    }
+}
+```
+
+### Lifecycle Execution Order
+
+```
+1. Bean Construction
+2. Dependency Injection
+3. BeanPostProcessor.postProcessBeforeInitialization()
+4. InitializingBean.afterPropertiesSet()
+5. @PostConstruct methods
+6. BeanPostProcessor.postProcessAfterInitialization()
+7. @PostInitialize methods (after ALL beans ready)
+8. SmartLifecycle.start() (by phase order)
+9. @OnStart methods
+   ↓ [Application Running]
+10. @OnStop methods
+11. SmartLifecycle.stop() (reverse phase order)
+12. @PreDestroy methods
+13. DisposableBean.destroy()
 ```
 
 ## AOP (Aspect-Oriented Programming)

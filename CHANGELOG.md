@@ -5,6 +5,53 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0-alpha.6] - 2025-12-04
+
+### Added
+
+#### Advanced Lifecycle Management (veld-runtime/lifecycle)
+- **Lifecycle Interfaces**:
+  - `Lifecycle` - Basic start/stop/isRunning interface
+  - `SmartLifecycle` - Extended lifecycle with phase ordering and auto-startup
+  - `Phased` - Interface for phase-based ordering
+  - `InitializingBean` - `afterPropertiesSet()` callback after injection
+  - `DisposableBean` - `destroy()` callback on container close
+  - `BeanPostProcessor` - Pre/post initialization hooks for custom bean modification
+
+- **Lifecycle Annotations** (veld-annotations):
+  - `@PostInitialize` - Execute after ALL beans are ready (not just dependencies)
+  - `@OnStart` - Execute when application context starts
+  - `@OnStop` - Execute when application context stops
+  - `@DependsOn` - Explicit bean initialization order
+
+- **Lifecycle Events** (EventBus integration):
+  - `ContextEvent` - Base class for lifecycle events (extends `Event`)
+  - `ContextRefreshedEvent` - Published after container initialization
+  - `ContextStartedEvent` - Published after lifecycle beans started
+  - `ContextStoppedEvent` - Published after lifecycle beans stopped
+  - `ContextClosedEvent` - Published before container shutdown
+
+- **LifecycleProcessor** - Central coordinator for lifecycle management:
+  - Phase-ordered startup (lower phase starts first)
+  - Phase-ordered shutdown (higher phase stops first)
+  - BeanPostProcessor chain execution
+  - Lifecycle event publishing via EventBus
+  - Statistics and monitoring
+
+### Fixed
+- Fixed EventBus integration: Changed `eventBus.post()` to `eventBus.publish()`
+- Fixed ContextEvent: Now properly extends `Event` for EventBus compatibility
+
+### Examples Added
+- `DatabaseConnection` - SmartLifecycle with early phase (-1000)
+- `CacheWarmer` - @PostInitialize with @DependsOn
+- `ScheduledTaskRunner` - @OnStart/@OnStop for scheduled tasks
+- `MetricsService` - InitializingBean/DisposableBean implementation
+- `LifecycleEventListener` - @Subscribe for lifecycle events
+- `LoggingBeanPostProcessor` - BeanPostProcessor example
+
+---
+
 ## [1.0.0-alpha.5] - 2025-12-04
 
 ### Added
@@ -165,6 +212,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 | Version | Date | Highlights |
 |---------|------|------------|
+| 1.0.0-alpha.6 | 2025-12-04 | Advanced Lifecycle Management, SmartLifecycle, BeanPostProcessor |
 | 1.0.0-alpha.5 | 2025-12-04 | EventBus, Complete AOP with ASM proxies |
 | 1.0.0-alpha.4 | 2025-12-03 | Conditional configuration, Optional injection |
 | 1.0.0-alpha.3 | 2025-12-02 | Named/Qualified injection |
@@ -173,6 +221,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.0.0-alpha.6]: https://github.com/yasmramos/Veld/compare/v1.0.0-alpha.5...v1.0.0-alpha.6
 [1.0.0-alpha.5]: https://github.com/yasmramos/Veld/compare/v1.0.0-alpha.4...v1.0.0-alpha.5
 [1.0.0-alpha.4]: https://github.com/yasmramos/Veld/compare/v1.0.0-alpha.3...v1.0.0-alpha.4
 [1.0.0-alpha.3]: https://github.com/yasmramos/Veld/compare/v1.0.0-alpha.2...v1.0.0-alpha.3
