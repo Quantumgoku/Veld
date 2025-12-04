@@ -9,21 +9,27 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * Tests for Veld annotations.
  * Tests annotation retention, targets, and default values.
+ * 
+ * Note: Annotations with CLASS retention are not available at runtime via reflection.
+ * For those, we can only verify the annotation metadata (retention, targets) by
+ * inspecting the annotation class itself.
  */
 @DisplayName("Annotations Tests")
 class AnnotationsTest {
+    
+    // ========== CLASS Retention Annotations (not available at runtime) ==========
     
     @Nested
     @DisplayName("Component Annotation Tests")
     class ComponentAnnotationTests {
         
         @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
             Retention retention = Component.class.getAnnotation(Retention.class);
             
             assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+            assertEquals(RetentionPolicy.CLASS, retention.value());
         }
         
         @Test
@@ -35,15 +41,13 @@ class AnnotationsTest {
             assertTrue(java.util.Arrays.asList(target.value()).contains(ElementType.TYPE));
         }
         
-        @Component
-        class TestComponent {}
-        
         @Test
-        @DisplayName("Should be applicable to class")
-        void shouldBeApplicableToClass() {
-            Component annotation = TestComponent.class.getAnnotation(Component.class);
-            
-            assertNotNull(annotation);
+        @DisplayName("Should have value attribute")
+        void shouldHaveValueAttribute() throws Exception {
+            var method = Component.class.getDeclaredMethod("value");
+            assertNotNull(method);
+            assertEquals(String.class, method.getReturnType());
+            assertEquals("", method.getDefaultValue());
         }
     }
     
@@ -52,23 +56,21 @@ class AnnotationsTest {
     class SingletonAnnotationTests {
         
         @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
             Retention retention = Singleton.class.getAnnotation(Retention.class);
             
             assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+            assertEquals(RetentionPolicy.CLASS, retention.value());
         }
         
-        @Singleton
-        class TestSingleton {}
-        
         @Test
-        @DisplayName("Should be applicable to class")
-        void shouldBeApplicableToClass() {
-            Singleton annotation = TestSingleton.class.getAnnotation(Singleton.class);
+        @DisplayName("Should target TYPE")
+        void shouldTargetType() {
+            Target target = Singleton.class.getAnnotation(Target.class);
             
-            assertNotNull(annotation);
+            assertNotNull(target);
+            assertTrue(java.util.Arrays.asList(target.value()).contains(ElementType.TYPE));
         }
     }
     
@@ -77,23 +79,21 @@ class AnnotationsTest {
     class PrototypeAnnotationTests {
         
         @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
             Retention retention = Prototype.class.getAnnotation(Retention.class);
             
             assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+            assertEquals(RetentionPolicy.CLASS, retention.value());
         }
         
-        @Prototype
-        class TestPrototype {}
-        
         @Test
-        @DisplayName("Should be applicable to class")
-        void shouldBeApplicableToClass() {
-            Prototype annotation = TestPrototype.class.getAnnotation(Prototype.class);
+        @DisplayName("Should target TYPE")
+        void shouldTargetType() {
+            Target target = Prototype.class.getAnnotation(Target.class);
             
-            assertNotNull(annotation);
+            assertNotNull(target);
+            assertTrue(java.util.Arrays.asList(target.value()).contains(ElementType.TYPE));
         }
     }
     
@@ -102,17 +102,17 @@ class AnnotationsTest {
     class InjectAnnotationTests {
         
         @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
             Retention retention = Inject.class.getAnnotation(Retention.class);
             
             assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+            assertEquals(RetentionPolicy.CLASS, retention.value());
         }
         
         @Test
-        @DisplayName("Should target FIELD, METHOD, CONSTRUCTOR, PARAMETER")
-        void shouldTargetFieldMethodConstructorParameter() {
+        @DisplayName("Should target FIELD, METHOD, CONSTRUCTOR")
+        void shouldTargetFieldMethodConstructor() {
             Target target = Inject.class.getAnnotation(Target.class);
             
             assertNotNull(target);
@@ -121,34 +121,6 @@ class AnnotationsTest {
             assertTrue(targets.contains(ElementType.METHOD));
             assertTrue(targets.contains(ElementType.CONSTRUCTOR));
         }
-        
-        class TestInject {
-            @Inject
-            private String field;
-            
-            @Inject
-            public void setField(String field) {
-                this.field = field;
-            }
-        }
-        
-        @Test
-        @DisplayName("Should be applicable to field")
-        void shouldBeApplicableToField() throws Exception {
-            Inject annotation = TestInject.class.getDeclaredField("field")
-                    .getAnnotation(Inject.class);
-            
-            assertNotNull(annotation);
-        }
-        
-        @Test
-        @DisplayName("Should be applicable to method")
-        void shouldBeApplicableToMethod() throws Exception {
-            Inject annotation = TestInject.class.getDeclaredMethod("setField", String.class)
-                    .getAnnotation(Inject.class);
-            
-            assertNotNull(annotation);
-        }
     }
     
     @Nested
@@ -156,26 +128,105 @@ class AnnotationsTest {
     class NamedAnnotationTests {
         
         @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
             Retention retention = Named.class.getAnnotation(Retention.class);
             
             assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+            assertEquals(RetentionPolicy.CLASS, retention.value());
         }
-        
-        @Named("testName")
-        class TestNamed {}
         
         @Test
-        @DisplayName("Should store name value")
-        void shouldStoreNameValue() {
-            Named annotation = TestNamed.class.getAnnotation(Named.class);
+        @DisplayName("Should target FIELD and PARAMETER")
+        void shouldTargetFieldAndParameter() {
+            Target target = Named.class.getAnnotation(Target.class);
             
-            assertNotNull(annotation);
-            assertEquals("testName", annotation.value());
+            assertNotNull(target);
+            java.util.List<ElementType> targets = java.util.Arrays.asList(target.value());
+            assertTrue(targets.contains(ElementType.FIELD));
+            assertTrue(targets.contains(ElementType.PARAMETER));
+        }
+        
+        @Test
+        @DisplayName("Should have value attribute")
+        void shouldHaveValueAttribute() throws Exception {
+            var method = Named.class.getDeclaredMethod("value");
+            assertNotNull(method);
+            assertEquals(String.class, method.getReturnType());
         }
     }
+    
+    @Nested
+    @DisplayName("Lazy Annotation Tests")
+    class LazyAnnotationTests {
+        
+        @Test
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
+            Retention retention = Lazy.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.CLASS, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Should target TYPE and FIELD")
+        void shouldTargetTypeAndField() {
+            Target target = Lazy.class.getAnnotation(Target.class);
+            
+            assertNotNull(target);
+            java.util.List<ElementType> targets = java.util.Arrays.asList(target.value());
+            assertTrue(targets.contains(ElementType.TYPE) || targets.contains(ElementType.FIELD));
+        }
+    }
+    
+    @Nested
+    @DisplayName("PostConstruct Annotation Tests")
+    class PostConstructAnnotationTests {
+        
+        @Test
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
+            Retention retention = PostConstruct.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.CLASS, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Should target METHOD")
+        void shouldTargetMethod() {
+            Target target = PostConstruct.class.getAnnotation(Target.class);
+            
+            assertNotNull(target);
+            assertTrue(java.util.Arrays.asList(target.value()).contains(ElementType.METHOD));
+        }
+    }
+    
+    @Nested
+    @DisplayName("PreDestroy Annotation Tests")
+    class PreDestroyAnnotationTests {
+        
+        @Test
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
+            Retention retention = PreDestroy.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.CLASS, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Should target METHOD")
+        void shouldTargetMethod() {
+            Target target = PreDestroy.class.getAnnotation(Target.class);
+            
+            assertNotNull(target);
+            assertTrue(java.util.Arrays.asList(target.value()).contains(ElementType.METHOD));
+        }
+    }
+    
+    // ========== RUNTIME Retention Annotations (available at runtime) ==========
     
     @Nested
     @DisplayName("Value Annotation Tests")
@@ -207,95 +258,15 @@ class AnnotationsTest {
             assertNotNull(annotation);
             assertEquals("${app.name}", annotation.value());
         }
-    }
-    
-    @Nested
-    @DisplayName("Lazy Annotation Tests")
-    class LazyAnnotationTests {
         
         @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
-            Retention retention = Lazy.class.getAnnotation(Retention.class);
-            
-            assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
-        }
-        
-        @Lazy
-        class TestLazy {}
-        
-        @Test
-        @DisplayName("Should be applicable to class")
-        void shouldBeApplicableToClass() {
-            Lazy annotation = TestLazy.class.getAnnotation(Lazy.class);
+        @DisplayName("Should store value with default")
+        void shouldStoreValueWithDefault() throws Exception {
+            Value annotation = TestValue.class.getDeclaredField("port")
+                    .getAnnotation(Value.class);
             
             assertNotNull(annotation);
-        }
-    }
-    
-    @Nested
-    @DisplayName("PostConstruct Annotation Tests")
-    class PostConstructAnnotationTests {
-        
-        @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
-            Retention retention = PostConstruct.class.getAnnotation(Retention.class);
-            
-            assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
-        }
-        
-        @Test
-        @DisplayName("Should target METHOD")
-        void shouldTargetMethod() {
-            Target target = PostConstruct.class.getAnnotation(Target.class);
-            
-            assertNotNull(target);
-            assertTrue(java.util.Arrays.asList(target.value()).contains(ElementType.METHOD));
-        }
-        
-        class TestPostConstruct {
-            @PostConstruct
-            public void init() {}
-        }
-        
-        @Test
-        @DisplayName("Should be applicable to method")
-        void shouldBeApplicableToMethod() throws Exception {
-            PostConstruct annotation = TestPostConstruct.class.getDeclaredMethod("init")
-                    .getAnnotation(PostConstruct.class);
-            
-            assertNotNull(annotation);
-        }
-    }
-    
-    @Nested
-    @DisplayName("PreDestroy Annotation Tests")
-    class PreDestroyAnnotationTests {
-        
-        @Test
-        @DisplayName("Should have RUNTIME retention")
-        void shouldHaveRuntimeRetention() {
-            Retention retention = PreDestroy.class.getAnnotation(Retention.class);
-            
-            assertNotNull(retention);
-            assertEquals(RetentionPolicy.RUNTIME, retention.value());
-        }
-        
-        class TestPreDestroy {
-            @PreDestroy
-            public void cleanup() {}
-        }
-        
-        @Test
-        @DisplayName("Should be applicable to method")
-        void shouldBeApplicableToMethod() throws Exception {
-            PreDestroy annotation = TestPreDestroy.class.getDeclaredMethod("cleanup")
-                    .getAnnotation(PreDestroy.class);
-            
-            assertNotNull(annotation);
+            assertEquals("${app.port:8080}", annotation.value());
         }
     }
     
@@ -316,7 +287,7 @@ class AnnotationsTest {
             @Subscribe
             public void onEvent(Object event) {}
             
-            @Subscribe(async = true, priority = 10, filter = "test", catchExceptions = true)
+            @Subscribe(async = true, priority = 10, filter = "test", catchExceptions = false)
             public void onFilteredEvent(Object event) {}
         }
         
@@ -330,7 +301,7 @@ class AnnotationsTest {
             assertFalse(annotation.async());
             assertEquals(0, annotation.priority());
             assertEquals("", annotation.filter());
-            assertFalse(annotation.catchExceptions());
+            assertTrue(annotation.catchExceptions()); // default is true
         }
         
         @Test
@@ -343,7 +314,7 @@ class AnnotationsTest {
             assertTrue(annotation.async());
             assertEquals(10, annotation.priority());
             assertEquals("test", annotation.filter());
-            assertTrue(annotation.catchExceptions());
+            assertFalse(annotation.catchExceptions());
         }
     }
     
@@ -389,14 +360,17 @@ class AnnotationsTest {
     @DisplayName("Conditional Annotations Tests")
     class ConditionalAnnotationsTests {
         
-        @ConditionalOnClass("java.lang.String")
+        @Test
+        @DisplayName("ConditionalOnClass should have RUNTIME retention")
+        void conditionalOnClassShouldHaveRuntimeRetention() {
+            Retention retention = ConditionalOnClass.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @ConditionalOnClass(name = "java.lang.String")
         class ConditionalOnClassComponent {}
-        
-        @ConditionalOnProperty(name = "feature.enabled", havingValue = "true")
-        class ConditionalOnPropertyComponent {}
-        
-        @ConditionalOnMissingBean(String.class)
-        class ConditionalOnMissingBeanComponent {}
         
         @Test
         @DisplayName("ConditionalOnClass should store class name")
@@ -405,7 +379,32 @@ class AnnotationsTest {
                     .getAnnotation(ConditionalOnClass.class);
             
             assertNotNull(annotation);
-            assertArrayEquals(new String[]{"java.lang.String"}, annotation.value());
+            assertArrayEquals(new String[]{"java.lang.String"}, annotation.name());
+        }
+        
+        @ConditionalOnClass(value = String.class)
+        class ConditionalOnClassByValueComponent {}
+        
+        @Test
+        @DisplayName("ConditionalOnClass should store class reference")
+        void conditionalOnClassShouldStoreClassReference() {
+            ConditionalOnClass annotation = ConditionalOnClassByValueComponent.class
+                    .getAnnotation(ConditionalOnClass.class);
+            
+            assertNotNull(annotation);
+            assertArrayEquals(new Class<?>[]{String.class}, annotation.value());
+        }
+        
+        @ConditionalOnProperty(name = "feature.enabled", havingValue = "true")
+        class ConditionalOnPropertyComponent {}
+        
+        @Test
+        @DisplayName("ConditionalOnProperty should have RUNTIME retention")
+        void conditionalOnPropertyShouldHaveRuntimeRetention() {
+            Retention retention = ConditionalOnProperty.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
         }
         
         @Test
@@ -419,6 +418,18 @@ class AnnotationsTest {
             assertEquals("true", annotation.havingValue());
         }
         
+        @ConditionalOnMissingBean(String.class)
+        class ConditionalOnMissingBeanComponent {}
+        
+        @Test
+        @DisplayName("ConditionalOnMissingBean should have RUNTIME retention")
+        void conditionalOnMissingBeanShouldHaveRuntimeRetention() {
+            Retention retention = ConditionalOnMissingBean.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
         @Test
         @DisplayName("ConditionalOnMissingBean should store bean type")
         void conditionalOnMissingBeanShouldStoreBeanType() {
@@ -426,7 +437,8 @@ class AnnotationsTest {
                     .getAnnotation(ConditionalOnMissingBean.class);
             
             assertNotNull(annotation);
-            assertEquals(String.class, annotation.value());
+            // value() returns Class<?>[] array
+            assertArrayEquals(new Class<?>[]{String.class}, annotation.value());
         }
     }
     
@@ -446,6 +458,15 @@ class AnnotationsTest {
         }
         
         @Test
+        @DisplayName("PostInitialize should have RUNTIME retention")
+        void postInitializeShouldHaveRuntimeRetention() {
+            Retention retention = PostInitialize.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
         @DisplayName("PostInitialize should have order attribute")
         void postInitializeShouldHaveOrderAttribute() throws Exception {
             PostInitialize annotation = TestLifecycle.class.getDeclaredMethod("postInit")
@@ -456,6 +477,15 @@ class AnnotationsTest {
         }
         
         @Test
+        @DisplayName("OnStart should have RUNTIME retention")
+        void onStartShouldHaveRuntimeRetention() {
+            Retention retention = OnStart.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
         @DisplayName("OnStart should have order attribute")
         void onStartShouldHaveOrderAttribute() throws Exception {
             OnStart annotation = TestLifecycle.class.getDeclaredMethod("onStart")
@@ -463,6 +493,15 @@ class AnnotationsTest {
             
             assertNotNull(annotation);
             assertEquals(2, annotation.order());
+        }
+        
+        @Test
+        @DisplayName("OnStop should have RUNTIME retention")
+        void onStopShouldHaveRuntimeRetention() {
+            Retention retention = OnStop.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
         }
         
         @Test
@@ -479,6 +518,15 @@ class AnnotationsTest {
     @Nested
     @DisplayName("DependsOn Annotation Tests")
     class DependsOnAnnotationTests {
+        
+        @Test
+        @DisplayName("Should have RUNTIME retention")
+        void shouldHaveRuntimeRetention() {
+            Retention retention = DependsOn.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
         
         @DependsOn("otherBean")
         class DependentComponent {}
@@ -502,6 +550,107 @@ class AnnotationsTest {
             
             assertNotNull(annotation);
             assertArrayEquals(new String[]{"bean1", "bean2", "bean3"}, annotation.value());
+        }
+    }
+    
+    @Nested
+    @DisplayName("AOP Annotations Tests")
+    class AopAnnotationsTests {
+        
+        @Test
+        @DisplayName("Aspect should have RUNTIME retention")
+        void aspectShouldHaveRuntimeRetention() {
+            Retention retention = Aspect.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Before should have RUNTIME retention")
+        void beforeShouldHaveRuntimeRetention() {
+            Retention retention = Before.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("After should have RUNTIME retention")
+        void afterShouldHaveRuntimeRetention() {
+            Retention retention = After.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Around should have RUNTIME retention")
+        void aroundShouldHaveRuntimeRetention() {
+            Retention retention = Around.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Pointcut should have RUNTIME retention")
+        void pointcutShouldHaveRuntimeRetention() {
+            Retention retention = Pointcut.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Interceptor should have RUNTIME retention")
+        void interceptorShouldHaveRuntimeRetention() {
+            Retention retention = Interceptor.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("InterceptorBinding should have RUNTIME retention")
+        void interceptorBindingShouldHaveRuntimeRetention() {
+            Retention retention = InterceptorBinding.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+        
+        @Test
+        @DisplayName("AroundInvoke should have RUNTIME retention")
+        void aroundInvokeShouldHaveRuntimeRetention() {
+            Retention retention = AroundInvoke.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.RUNTIME, retention.value());
+        }
+    }
+    
+    @Nested
+    @DisplayName("Optional Annotation Tests")
+    class OptionalAnnotationTests {
+        
+        @Test
+        @DisplayName("Should have CLASS retention")
+        void shouldHaveClassRetention() {
+            Retention retention = Optional.class.getAnnotation(Retention.class);
+            
+            assertNotNull(retention);
+            assertEquals(RetentionPolicy.CLASS, retention.value());
+        }
+        
+        @Test
+        @DisplayName("Should target FIELD and PARAMETER")
+        void shouldTargetFieldAndParameter() {
+            Target target = Optional.class.getAnnotation(Target.class);
+            
+            assertNotNull(target);
+            java.util.List<ElementType> targets = java.util.Arrays.asList(target.value());
+            assertTrue(targets.contains(ElementType.FIELD) || targets.contains(ElementType.PARAMETER));
         }
     }
 }

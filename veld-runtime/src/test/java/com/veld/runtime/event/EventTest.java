@@ -2,8 +2,6 @@ package com.veld.runtime.event;
 
 import org.junit.jupiter.api.*;
 
-import java.time.Instant;
-
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
@@ -12,122 +10,115 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Event Tests")
 class EventTest {
     
+    // Test implementation of abstract Event
     static class TestEvent extends Event {
-        TestEvent(Object source) {
+        private final String message;
+        
+        TestEvent(Object source, String message) {
             super(source);
+            this.message = message;
+        }
+        
+        TestEvent(String message) {
+            super();
+            this.message = message;
+        }
+        
+        String getMessage() {
+            return message;
         }
     }
     
-    @Nested
-    @DisplayName("Construction Tests")
-    class ConstructionTests {
+    @Test
+    @DisplayName("Should generate unique event ID")
+    void shouldGenerateUniqueEventId() {
+        TestEvent event1 = new TestEvent("test1");
+        TestEvent event2 = new TestEvent("test2");
         
-        @Test
-        @DisplayName("Should create event with source")
-        void shouldCreateEventWithSource() {
-            Object source = new Object();
-            TestEvent event = new TestEvent(source);
-            
-            assertSame(source, event.getSource());
-        }
-        
-        @Test
-        @DisplayName("Should throw exception for null source")
-        void shouldThrowExceptionForNullSource() {
-            assertThrows(IllegalArgumentException.class, () -> 
-                new TestEvent(null));
-        }
-        
-        @Test
-        @DisplayName("Should set timestamp on creation")
-        void shouldSetTimestampOnCreation() {
-            Instant before = Instant.now();
-            TestEvent event = new TestEvent(this);
-            Instant after = Instant.now();
-            
-            assertNotNull(event.getTimestamp());
-            assertFalse(event.getTimestamp().isBefore(before));
-            assertFalse(event.getTimestamp().isAfter(after));
-        }
+        assertNotNull(event1.getEventId());
+        assertNotNull(event2.getEventId());
+        assertNotEquals(event1.getEventId(), event2.getEventId());
     }
     
-    @Nested
-    @DisplayName("Cancellation Tests")
-    class CancellationTests {
+    @Test
+    @DisplayName("Should record timestamp")
+    void shouldRecordTimestamp() {
+        TestEvent event = new TestEvent("test");
         
-        @Test
-        @DisplayName("Should not be cancelled by default")
-        void shouldNotBeCancelledByDefault() {
-            TestEvent event = new TestEvent(this);
-            
-            assertFalse(event.isCancelled());
-        }
-        
-        @Test
-        @DisplayName("Should be cancellable")
-        void shouldBeCancellable() {
-            TestEvent event = new TestEvent(this);
-            
-            event.cancel();
-            
-            assertTrue(event.isCancelled());
-        }
+        assertNotNull(event.getTimestamp());
     }
     
-    @Nested
-    @DisplayName("Property Tests")
-    class PropertyTests {
+    @Test
+    @DisplayName("Should store source")
+    void shouldStoreSource() {
+        Object source = new Object();
+        TestEvent event = new TestEvent(source, "test");
         
-        @Test
-        @DisplayName("Should set and get property")
-        void shouldSetAndGetProperty() {
-            TestEvent event = new TestEvent(this);
-            
-            event.setProperty("key", "value");
-            
-            assertEquals("value", event.getProperty("key"));
-        }
-        
-        @Test
-        @DisplayName("Should return null for missing property")
-        void shouldReturnNullForMissingProperty() {
-            TestEvent event = new TestEvent(this);
-            
-            assertNull(event.getProperty("missing"));
-        }
-        
-        @Test
-        @DisplayName("Should return default for missing property")
-        void shouldReturnDefaultForMissingProperty() {
-            TestEvent event = new TestEvent(this);
-            
-            assertEquals("default", event.getProperty("missing", "default"));
-        }
-        
-        @Test
-        @DisplayName("Should check if property exists")
-        void shouldCheckIfPropertyExists() {
-            TestEvent event = new TestEvent(this);
-            event.setProperty("key", "value");
-            
-            assertTrue(event.hasProperty("key"));
-            assertFalse(event.hasProperty("missing"));
-        }
+        assertSame(source, event.getSource());
     }
     
-    @Nested
-    @DisplayName("ToString Tests")
-    class ToStringTests {
+    @Test
+    @DisplayName("Should allow null source")
+    void shouldAllowNullSource() {
+        TestEvent event = new TestEvent("test");
         
-        @Test
-        @DisplayName("Should return meaningful toString")
-        void shouldReturnMeaningfulToString() {
-            TestEvent event = new TestEvent(this);
-            
-            String result = event.toString();
-            
-            assertNotNull(result);
-            assertTrue(result.contains("TestEvent"));
-        }
+        assertNull(event.getSource());
+    }
+    
+    @Test
+    @DisplayName("Should not be cancelled initially")
+    void shouldNotBeCancelledInitially() {
+        TestEvent event = new TestEvent("test");
+        
+        assertFalse(event.isCancelled());
+    }
+    
+    @Test
+    @DisplayName("Should be cancellable")
+    void shouldBeCancellable() {
+        TestEvent event = new TestEvent("test");
+        
+        event.cancel();
+        
+        assertTrue(event.isCancelled());
+    }
+    
+    @Test
+    @DisplayName("Should not be consumed initially")
+    void shouldNotBeConsumedInitially() {
+        TestEvent event = new TestEvent("test");
+        
+        assertFalse(event.isConsumed());
+    }
+    
+    @Test
+    @DisplayName("Should be consumable")
+    void shouldBeConsumable() {
+        TestEvent event = new TestEvent("test");
+        
+        event.consume();
+        
+        assertTrue(event.isConsumed());
+    }
+    
+    @Test
+    @DisplayName("Should return event type name")
+    void shouldReturnEventTypeName() {
+        TestEvent event = new TestEvent("test");
+        
+        assertEquals("TestEvent", event.getEventType());
+    }
+    
+    @Test
+    @DisplayName("Should have meaningful toString")
+    void shouldHaveMeaningfulToString() {
+        Object source = new Object();
+        TestEvent event = new TestEvent(source, "test");
+        
+        String toString = event.toString();
+        
+        assertTrue(toString.contains("TestEvent"));
+        assertTrue(toString.contains("id="));
+        assertTrue(toString.contains("timestamp="));
     }
 }

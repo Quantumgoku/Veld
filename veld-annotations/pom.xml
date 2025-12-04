@@ -16,6 +16,11 @@
     <name>Veld Annotations</name>
     <description>Core annotations for Veld DI Framework</description>
 
+    <properties>
+        <!-- Skip JaCoCo check - annotations have no executable code -->
+        <jacoco.skip>true</jacoco.skip>
+    </properties>
+
     <dependencies>
         <!-- Testing -->
         <dependency>

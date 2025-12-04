@@ -4,8 +4,6 @@ import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
-import java.util.Set;
-
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -15,131 +13,165 @@ import static org.mockito.Mockito.*;
 @DisplayName("ConditionEvaluator Tests")
 class ConditionEvaluatorTest {
     
-    private ConditionEvaluator evaluator;
-    
     @Mock
     private ConditionContext mockContext;
     
+    private AutoCloseable mocks;
+    
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        evaluator = new ConditionEvaluator();
+        mocks = MockitoAnnotations.openMocks(this);
     }
     
-    @Nested
-    @DisplayName("Condition Registration Tests")
-    class ConditionRegistrationTests {
-        
-        @Test
-        @DisplayName("Should register condition")
-        void shouldRegisterCondition() {
-            Condition condition = ctx -> true;
-            
-            evaluator.registerCondition("testBean", condition);
-            
-            assertTrue(evaluator.hasConditions("testBean"));
-        }
-        
-        @Test
-        @DisplayName("Should register multiple conditions for same bean")
-        void shouldRegisterMultipleConditionsForSameBean() {
-            Condition condition1 = ctx -> true;
-            Condition condition2 = ctx -> true;
-            
-            evaluator.registerCondition("testBean", condition1);
-            evaluator.registerCondition("testBean", condition2);
-            
-            assertTrue(evaluator.hasConditions("testBean"));
-        }
-        
-        @Test
-        @DisplayName("Should report no conditions for unregistered bean")
-        void shouldReportNoConditionsForUnregisteredBean() {
-            assertFalse(evaluator.hasConditions("unknownBean"));
-        }
+    @AfterEach
+    void tearDown() throws Exception {
+        mocks.close();
     }
     
-    @Nested
-    @DisplayName("Condition Evaluation Tests")
-    class ConditionEvaluationTests {
-        
-        @Test
-        @DisplayName("Should return true when all conditions match")
-        void shouldReturnTrueWhenAllConditionsMatch() {
-            evaluator.registerCondition("testBean", ctx -> true);
-            evaluator.registerCondition("testBean", ctx -> true);
+    // Helper method to create a simple condition
+    private Condition createCondition(boolean result, String description) {
+        return new Condition() {
+            @Override
+            public boolean matches(ConditionContext context) {
+                return result;
+            }
             
-            assertTrue(evaluator.shouldSkip("testBean", mockContext));
-        }
-        
-        @Test
-        @DisplayName("Should return false when any condition fails")
-        void shouldReturnFalseWhenAnyConditionFails() {
-            evaluator.registerCondition("testBean", ctx -> true);
-            evaluator.registerCondition("testBean", ctx -> false);
-            
-            assertFalse(evaluator.shouldSkip("testBean", mockContext));
-        }
-        
-        @Test
-        @DisplayName("Should return true for bean without conditions")
-        void shouldReturnTrueForBeanWithoutConditions() {
-            assertTrue(evaluator.shouldSkip("unknownBean", mockContext));
-        }
-        
-        @Test
-        @DisplayName("Should pass context to conditions")
-        void shouldPassContextToConditions() {
-            Condition condition = mock(Condition.class);
-            when(condition.matches(mockContext)).thenReturn(true);
-            evaluator.registerCondition("testBean", condition);
-            
-            evaluator.shouldSkip("testBean", mockContext);
-            
-            verify(condition).matches(mockContext);
-        }
+            @Override
+            public String getDescription() {
+                return description;
+            }
+        };
     }
     
-    @Nested
-    @DisplayName("Bean Names Tests")
-    class BeanNamesTests {
+    @Test
+    @DisplayName("Should create evaluator with component name")
+    void shouldCreateEvaluatorWithComponentName() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
         
-        @Test
-        @DisplayName("Should return all beans with conditions")
-        void shouldReturnAllBeansWithConditions() {
-            evaluator.registerCondition("bean1", ctx -> true);
-            evaluator.registerCondition("bean2", ctx -> true);
-            
-            Set<String> beanNames = evaluator.getBeansWithConditions();
-            
-            assertEquals(2, beanNames.size());
-            assertTrue(beanNames.contains("bean1"));
-            assertTrue(beanNames.contains("bean2"));
-        }
-        
-        @Test
-        @DisplayName("Should return empty set when no conditions registered")
-        void shouldReturnEmptySetWhenNoConditionsRegistered() {
-            Set<String> beanNames = evaluator.getBeansWithConditions();
-            
-            assertTrue(beanNames.isEmpty());
-        }
+        assertEquals("testComponent", evaluator.getComponentName());
     }
     
-    @Nested
-    @DisplayName("Clear Tests")
-    class ClearTests {
+    @Test
+    @DisplayName("Should have no conditions initially")
+    void shouldHaveNoConditionsInitially() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
         
-        @Test
-        @DisplayName("Should clear all conditions")
-        void shouldClearAllConditions() {
-            evaluator.registerCondition("bean1", ctx -> true);
-            evaluator.registerCondition("bean2", ctx -> true);
-            
-            evaluator.clear();
-            
-            assertFalse(evaluator.hasConditions("bean1"));
-            assertFalse(evaluator.hasConditions("bean2"));
-        }
+        assertFalse(evaluator.hasConditions());
+        assertTrue(evaluator.getConditions().isEmpty());
+    }
+    
+    @Test
+    @DisplayName("Should add condition")
+    void shouldAddCondition() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        Condition condition = createCondition(true, "test");
+        
+        evaluator.addCondition(condition);
+        
+        assertTrue(evaluator.hasConditions());
+        assertEquals(1, evaluator.getConditions().size());
+    }
+    
+    @Test
+    @DisplayName("Should add property condition")
+    void shouldAddPropertyCondition() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        
+        evaluator.addPropertyCondition("test.prop", "expectedValue", false);
+        
+        assertTrue(evaluator.hasConditions());
+    }
+    
+    @Test
+    @DisplayName("Should add class condition")
+    void shouldAddClassCondition() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        
+        evaluator.addClassCondition("java.lang.String");
+        
+        assertTrue(evaluator.hasConditions());
+    }
+    
+    @Test
+    @DisplayName("Should add missing bean condition")
+    void shouldAddMissingBeanCondition() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        
+        evaluator.addMissingBeanCondition("com.example.SomeBean");
+        
+        assertTrue(evaluator.hasConditions());
+    }
+    
+    @Test
+    @DisplayName("Should add missing bean name condition")
+    void shouldAddMissingBeanNameCondition() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        
+        evaluator.addMissingBeanNameCondition("beanName");
+        
+        assertTrue(evaluator.hasConditions());
+    }
+    
+    @Test
+    @DisplayName("Should add profile condition")
+    void shouldAddProfileCondition() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        
+        evaluator.addProfileCondition("dev", "test");
+        
+        assertTrue(evaluator.hasConditions());
+    }
+    
+    @Test
+    @DisplayName("Should evaluate to true when no conditions")
+    void shouldEvaluateToTrueWhenNoConditions() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        
+        assertTrue(evaluator.evaluate(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should evaluate to true when all conditions pass")
+    void shouldEvaluateToTrueWhenAllConditionsPass() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        evaluator.addCondition(createCondition(true, "condition1"));
+        evaluator.addCondition(createCondition(true, "condition2"));
+        
+        assertTrue(evaluator.evaluate(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should evaluate to false when any condition fails")
+    void shouldEvaluateToFalseWhenAnyConditionFails() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        evaluator.addCondition(createCondition(true, "passing"));
+        evaluator.addCondition(createCondition(false, "failing"));
+        
+        assertFalse(evaluator.evaluate(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should support method chaining")
+    void shouldSupportMethodChaining() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent")
+                .addCondition(createCondition(true, "test"))
+                .addPropertyCondition("prop", "val", false)
+                .addClassCondition("java.lang.String")
+                .addProfileCondition("dev");
+        
+        assertTrue(evaluator.hasConditions());
+        assertEquals(4, evaluator.getConditions().size());
+    }
+    
+    @Test
+    @DisplayName("Should provide failure message for failing conditions")
+    void shouldProvideFailureMessage() {
+        ConditionEvaluator evaluator = new ConditionEvaluator("testComponent");
+        evaluator.addCondition(createCondition(false, "Test condition failed"));
+        
+        String failureMessage = evaluator.getFailureMessage(mockContext);
+        
+        assertTrue(failureMessage.contains("testComponent"));
+        assertTrue(failureMessage.contains("Test condition failed"));
     }
 }

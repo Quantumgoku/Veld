@@ -10,81 +10,49 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("VeldException Tests")
 class VeldExceptionTest {
     
-    @Nested
-    @DisplayName("Constructor Tests")
-    class ConstructorTests {
+    @Test
+    @DisplayName("Should create with message")
+    void shouldCreateWithMessage() {
+        VeldException exception = new VeldException("Test message");
         
-        @Test
-        @DisplayName("Should create exception with message")
-        void shouldCreateExceptionWithMessage() {
-            VeldException exception = new VeldException("Test message");
-            
-            assertEquals("Test message", exception.getMessage());
-        }
-        
-        @Test
-        @DisplayName("Should create exception with message and cause")
-        void shouldCreateExceptionWithMessageAndCause() {
-            Throwable cause = new RuntimeException("Cause");
-            VeldException exception = new VeldException("Test message", cause);
-            
-            assertEquals("Test message", exception.getMessage());
-            assertSame(cause, exception.getCause());
-        }
-        
-        @Test
-        @DisplayName("Should create exception with cause only")
-        void shouldCreateExceptionWithCauseOnly() {
-            Throwable cause = new RuntimeException("Cause");
-            VeldException exception = new VeldException(cause);
-            
-            assertSame(cause, exception.getCause());
-        }
+        assertEquals("Test message", exception.getMessage());
+        assertNull(exception.getCause());
     }
     
-    @Nested
-    @DisplayName("Inheritance Tests")
-    class InheritanceTests {
+    @Test
+    @DisplayName("Should create with message and cause")
+    void shouldCreateWithMessageAndCause() {
+        RuntimeException cause = new RuntimeException("Original error");
         
-        @Test
-        @DisplayName("Should be a RuntimeException")
-        void shouldBeARuntimeException() {
-            VeldException exception = new VeldException("Test");
-            
-            assertTrue(exception instanceof RuntimeException);
-        }
+        VeldException exception = new VeldException("Wrapper message", cause);
         
-        @Test
-        @DisplayName("Should be throwable")
-        void shouldBeThrowable() {
-            assertThrows(VeldException.class, () -> {
-                throw new VeldException("Test");
-            });
-        }
+        assertEquals("Wrapper message", exception.getMessage());
+        assertSame(cause, exception.getCause());
     }
     
-    @Nested
-    @DisplayName("Catch Tests")
-    class CatchTests {
+    @Test
+    @DisplayName("Should be RuntimeException")
+    void shouldBeRuntimeException() {
+        VeldException exception = new VeldException("Test");
         
-        @Test
-        @DisplayName("Should be catchable as VeldException")
-        void shouldBeCatchableAsVeldException() {
-            try {
-                throw new VeldException("Test");
-            } catch (VeldException e) {
-                assertEquals("Test", e.getMessage());
-            }
-        }
+        assertTrue(exception instanceof RuntimeException);
+    }
+    
+    @Test
+    @DisplayName("Should be throwable without declaration")
+    void shouldBeThrowableWithoutDeclaration() {
+        assertThrows(VeldException.class, () -> {
+            throw new VeldException("Test error");
+        });
+    }
+    
+    @Test
+    @DisplayName("Should preserve cause stack trace")
+    void shouldPreserveCauseStackTrace() {
+        IllegalStateException cause = new IllegalStateException("Cause");
+        VeldException exception = new VeldException("Wrapper", cause);
         
-        @Test
-        @DisplayName("Should be catchable as RuntimeException")
-        void shouldBeCatchableAsRuntimeException() {
-            try {
-                throw new VeldException("Test");
-            } catch (RuntimeException e) {
-                assertTrue(e instanceof VeldException);
-            }
-        }
+        assertNotNull(exception.getCause().getStackTrace());
+        assertTrue(exception.getCause().getStackTrace().length > 0);
     }
 }

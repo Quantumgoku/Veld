@@ -4,6 +4,10 @@ import org.junit.jupiter.api.*;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -16,89 +20,146 @@ class MissingBeanConditionTest {
     @Mock
     private ConditionContext mockContext;
     
+    private AutoCloseable mocks;
+    
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        mocks = MockitoAnnotations.openMocks(this);
     }
     
-    @Nested
-    @DisplayName("Bean Type Tests")
-    class BeanTypeTests {
-        
-        @Test
-        @DisplayName("Should match when bean type is missing")
-        void shouldMatchWhenBeanTypeIsMissing() {
-            when(mockContext.containsBean(String.class)).thenReturn(false);
-            MissingBeanCondition condition = new MissingBeanCondition(String.class);
-            
-            assertTrue(condition.matches(mockContext));
-        }
-        
-        @Test
-        @DisplayName("Should not match when bean type exists")
-        void shouldNotMatchWhenBeanTypeExists() {
-            when(mockContext.containsBean(String.class)).thenReturn(true);
-            MissingBeanCondition condition = new MissingBeanCondition(String.class);
-            
-            assertFalse(condition.matches(mockContext));
-        }
+    @AfterEach
+    void tearDown() throws Exception {
+        mocks.close();
     }
     
-    @Nested
-    @DisplayName("Bean Name Tests")
-    class BeanNameTests {
+    @Test
+    @DisplayName("Should create condition for types")
+    void shouldCreateConditionForTypes() {
+        MissingBeanCondition condition = MissingBeanCondition.forTypes("com.example.Type1", "com.example.Type2");
         
-        @Test
-        @DisplayName("Should match when bean name is missing")
-        void shouldMatchWhenBeanNameIsMissing() {
-            when(mockContext.containsBean("myBean")).thenReturn(false);
-            MissingBeanCondition condition = new MissingBeanCondition("myBean");
-            
-            assertTrue(condition.matches(mockContext));
-        }
-        
-        @Test
-        @DisplayName("Should not match when bean name exists")
-        void shouldNotMatchWhenBeanNameExists() {
-            when(mockContext.containsBean("myBean")).thenReturn(true);
-            MissingBeanCondition condition = new MissingBeanCondition("myBean");
-            
-            assertFalse(condition.matches(mockContext));
-        }
+        assertEquals(2, condition.getBeanTypes().size());
+        assertTrue(condition.getBeanTypes().contains("com.example.Type1"));
+        assertTrue(condition.getBeanTypes().contains("com.example.Type2"));
+        assertTrue(condition.getBeanNames().isEmpty());
     }
     
-    @Nested
-    @DisplayName("Combined Condition Tests")
-    class CombinedConditionTests {
+    @Test
+    @DisplayName("Should create condition for names")
+    void shouldCreateConditionForNames() {
+        MissingBeanCondition condition = MissingBeanCondition.forNames("bean1", "bean2");
         
-        @Test
-        @DisplayName("Should match when both type and name are missing")
-        void shouldMatchWhenBothTypeAndNameAreMissing() {
-            when(mockContext.containsBean(String.class)).thenReturn(false);
-            when(mockContext.containsBean("myBean")).thenReturn(false);
-            MissingBeanCondition condition = new MissingBeanCondition(String.class, "myBean");
-            
-            assertTrue(condition.matches(mockContext));
-        }
+        assertEquals(2, condition.getBeanNames().size());
+        assertTrue(condition.getBeanNames().contains("bean1"));
+        assertTrue(condition.getBeanNames().contains("bean2"));
+        assertTrue(condition.getBeanTypes().isEmpty());
+    }
+    
+    @Test
+    @DisplayName("Should match when type is missing")
+    void shouldMatchWhenTypeIsMissing() {
+        when(mockContext.containsBeanType("com.example.Missing")).thenReturn(false);
         
-        @Test
-        @DisplayName("Should not match when type exists")
-        void shouldNotMatchWhenTypeExists() {
-            when(mockContext.containsBean(String.class)).thenReturn(true);
-            when(mockContext.containsBean("myBean")).thenReturn(false);
-            MissingBeanCondition condition = new MissingBeanCondition(String.class, "myBean");
-            
-            assertFalse(condition.matches(mockContext));
-        }
+        MissingBeanCondition condition = MissingBeanCondition.forTypes("com.example.Missing");
         
-        @Test
-        @DisplayName("Should not match when name exists")
-        void shouldNotMatchWhenNameExists() {
-            when(mockContext.containsBean(String.class)).thenReturn(false);
-            when(mockContext.containsBean("myBean")).thenReturn(true);
-            MissingBeanCondition condition = new MissingBeanCondition(String.class, "myBean");
-            
-            assertFalse(condition.matches(mockContext));
-        }
+        assertTrue(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should not match when type is present")
+    void shouldNotMatchWhenTypeIsPresent() {
+        when(mockContext.containsBeanType("com.example.Present")).thenReturn(true);
+        
+        MissingBeanCondition condition = MissingBeanCondition.forTypes("com.example.Present");
+        
+        assertFalse(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should match when name is missing")
+    void shouldMatchWhenNameIsMissing() {
+        when(mockContext.containsBeanName("missingBean")).thenReturn(false);
+        
+        MissingBeanCondition condition = MissingBeanCondition.forNames("missingBean");
+        
+        assertTrue(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should not match when name is present")
+    void shouldNotMatchWhenNameIsPresent() {
+        when(mockContext.containsBeanName("presentBean")).thenReturn(true);
+        
+        MissingBeanCondition condition = MissingBeanCondition.forNames("presentBean");
+        
+        assertFalse(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should match when all types are missing")
+    void shouldMatchWhenAllTypesAreMissing() {
+        when(mockContext.containsBeanType(anyString())).thenReturn(false);
+        
+        MissingBeanCondition condition = MissingBeanCondition.forTypes("type1", "type2", "type3");
+        
+        assertTrue(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should not match when any type is present")
+    void shouldNotMatchWhenAnyTypeIsPresent() {
+        when(mockContext.containsBeanType("type1")).thenReturn(false);
+        when(mockContext.containsBeanType("type2")).thenReturn(true);
+        when(mockContext.containsBeanType("type3")).thenReturn(false);
+        
+        MissingBeanCondition condition = MissingBeanCondition.forTypes("type1", "type2", "type3");
+        
+        assertFalse(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should match with both types and names when all missing")
+    void shouldMatchWithBothTypesAndNamesWhenAllMissing() {
+        when(mockContext.containsBeanType("type1")).thenReturn(false);
+        when(mockContext.containsBeanName("name1")).thenReturn(false);
+        
+        MissingBeanCondition condition = new MissingBeanCondition(
+                List.of("type1"),
+                List.of("name1")
+        );
+        
+        assertTrue(condition.matches(mockContext));
+    }
+    
+    @Test
+    @DisplayName("Should provide description with types")
+    void shouldProvideDescriptionWithTypes() {
+        MissingBeanCondition condition = MissingBeanCondition.forTypes("com.example.Type");
+        
+        String description = condition.getDescription();
+        
+        assertTrue(description.contains("@ConditionalOnMissingBean"));
+        assertTrue(description.contains("com.example.Type"));
+    }
+    
+    @Test
+    @DisplayName("Should provide description with names")
+    void shouldProvideDescriptionWithNames() {
+        MissingBeanCondition condition = MissingBeanCondition.forNames("myBean");
+        
+        String description = condition.getDescription();
+        
+        assertTrue(description.contains("@ConditionalOnMissingBean"));
+        assertTrue(description.contains("myBean"));
+    }
+    
+    @Test
+    @DisplayName("Should match when no types or names specified")
+    void shouldMatchWhenNoTypesOrNamesSpecified() {
+        MissingBeanCondition condition = new MissingBeanCondition(
+                Collections.emptyList(),
+                Collections.emptyList()
+        );
+        
+        assertTrue(condition.matches(mockContext));
     }
 }

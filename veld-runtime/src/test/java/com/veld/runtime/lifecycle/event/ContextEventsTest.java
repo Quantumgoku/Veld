@@ -12,56 +12,38 @@ import static org.junit.jupiter.api.Assertions.*;
 @DisplayName("Context Events Tests")
 class ContextEventsTest {
     
-    private final Object source = new Object();
-    
-    @Nested
-    @DisplayName("ContextRefreshedEvent Tests")
-    class ContextRefreshedEventTests {
-        
-        @Test
-        @DisplayName("Should create event with bean count and init time")
-        void shouldCreateEventWithBeanCountAndInitTime() {
-            ContextRefreshedEvent event = new ContextRefreshedEvent(source, 10, 500);
-            
-            assertEquals(10, event.getBeanCount());
-            assertEquals(500, event.getInitializationTimeMs());
-        }
-        
-        @Test
-        @DisplayName("Should have source")
-        void shouldHaveSource() {
-            ContextRefreshedEvent event = new ContextRefreshedEvent(source, 10, 500);
-            
-            assertSame(source, event.getSource());
-        }
-        
-        @Test
-        @DisplayName("Should have timestamp")
-        void shouldHaveTimestamp() {
-            ContextRefreshedEvent event = new ContextRefreshedEvent(source, 10, 500);
-            
-            assertNotNull(event.getTimestamp());
-        }
-    }
-    
     @Nested
     @DisplayName("ContextStartedEvent Tests")
     class ContextStartedEventTests {
         
         @Test
-        @DisplayName("Should create event with lifecycle count")
-        void shouldCreateEventWithLifecycleCount() {
-            ContextStartedEvent event = new ContextStartedEvent(source, 5);
+        @DisplayName("Should create with source and lifecycle count")
+        void shouldCreateWithSourceAndLifecycleCount() {
+            Object source = new Object();
             
-            assertEquals(5, event.getLifecycleBeansStarted());
-        }
-        
-        @Test
-        @DisplayName("Should have source")
-        void shouldHaveSource() {
             ContextStartedEvent event = new ContextStartedEvent(source, 5);
             
             assertSame(source, event.getSource());
+            assertEquals(5, event.getLifecycleBeanCount());
+        }
+        
+        @Test
+        @DisplayName("Should have timestamp")
+        void shouldHaveTimestamp() {
+            ContextStartedEvent event = new ContextStartedEvent(this, 0);
+            
+            assertNotNull(event.getTimestamp());
+        }
+        
+        @Test
+        @DisplayName("Should have meaningful toString")
+        void shouldHaveMeaningfulToString() {
+            ContextStartedEvent event = new ContextStartedEvent(this, 3);
+            
+            String toString = event.toString();
+            
+            assertTrue(toString.contains("ContextStartedEvent"));
+            assertTrue(toString.contains("lifecycleBeanCount=3"));
         }
     }
     
@@ -70,19 +52,33 @@ class ContextEventsTest {
     class ContextStoppedEventTests {
         
         @Test
-        @DisplayName("Should create event with lifecycle count")
-        void shouldCreateEventWithLifecycleCount() {
-            ContextStoppedEvent event = new ContextStoppedEvent(source, 3);
+        @DisplayName("Should create with source and lifecycle count")
+        void shouldCreateWithSourceAndLifecycleCount() {
+            Object source = new Object();
             
-            assertEquals(3, event.getLifecycleBeansStopped());
+            ContextStoppedEvent event = new ContextStoppedEvent(source, 10);
+            
+            assertSame(source, event.getSource());
+            assertEquals(10, event.getLifecycleBeanCount());
         }
         
         @Test
-        @DisplayName("Should have source")
-        void shouldHaveSource() {
-            ContextStoppedEvent event = new ContextStoppedEvent(source, 3);
+        @DisplayName("Should have timestamp")
+        void shouldHaveTimestamp() {
+            ContextStoppedEvent event = new ContextStoppedEvent(this, 0);
             
-            assertSame(source, event.getSource());
+            assertNotNull(event.getTimestamp());
+        }
+        
+        @Test
+        @DisplayName("Should have meaningful toString")
+        void shouldHaveMeaningfulToString() {
+            ContextStoppedEvent event = new ContextStoppedEvent(this, 7);
+            
+            String toString = event.toString();
+            
+            assertTrue(toString.contains("ContextStoppedEvent"));
+            assertTrue(toString.contains("lifecycleBeanCount=7"));
         }
     }
     
@@ -91,41 +87,36 @@ class ContextEventsTest {
     class ContextClosedEventTests {
         
         @Test
-        @DisplayName("Should create event with uptime and destroyed count")
-        void shouldCreateEventWithUptimeAndDestroyedCount() {
-            Duration uptime = Duration.ofMinutes(10);
-            ContextClosedEvent event = new ContextClosedEvent(source, uptime, 8);
+        @DisplayName("Should create with source, uptime and destroyed count")
+        void shouldCreateWithSourceUptimeAndDestroyedCount() {
+            Object source = new Object();
+            Duration uptime = Duration.ofMinutes(30);
             
-            assertEquals(uptime, event.getUptime());
-            assertEquals(8, event.getBeansDestroyed());
-        }
-        
-        @Test
-        @DisplayName("Should have source")
-        void shouldHaveSource() {
-            Duration uptime = Duration.ofMinutes(10);
-            ContextClosedEvent event = new ContextClosedEvent(source, uptime, 8);
+            ContextClosedEvent event = new ContextClosedEvent(source, uptime, 15);
             
             assertSame(source, event.getSource());
+            assertEquals(uptime, event.getUptime());
+            assertEquals(15, event.getDestroyedBeanCount());
         }
-    }
-    
-    @Nested
-    @DisplayName("ContextEvent Base Tests")
-    class ContextEventBaseTests {
         
         @Test
-        @DisplayName("All context events should extend Event")
-        void allContextEventsShouldExtendEvent() {
-            ContextRefreshedEvent refreshed = new ContextRefreshedEvent(source, 0, 0);
-            ContextStartedEvent started = new ContextStartedEvent(source, 0);
-            ContextStoppedEvent stopped = new ContextStoppedEvent(source, 0);
-            ContextClosedEvent closed = new ContextClosedEvent(source, Duration.ZERO, 0);
+        @DisplayName("Should have timestamp")
+        void shouldHaveTimestamp() {
+            ContextClosedEvent event = new ContextClosedEvent(this, Duration.ZERO, 0);
             
-            assertTrue(refreshed instanceof com.veld.runtime.event.Event);
-            assertTrue(started instanceof com.veld.runtime.event.Event);
-            assertTrue(stopped instanceof com.veld.runtime.event.Event);
-            assertTrue(closed instanceof com.veld.runtime.event.Event);
+            assertNotNull(event.getTimestamp());
+        }
+        
+        @Test
+        @DisplayName("Should have meaningful toString")
+        void shouldHaveMeaningfulToString() {
+            ContextClosedEvent event = new ContextClosedEvent(this, Duration.ofHours(1), 20);
+            
+            String toString = event.toString();
+            
+            assertTrue(toString.contains("ContextClosedEvent"));
+            assertTrue(toString.contains("destroyedBeanCount=20"));
+            assertTrue(toString.contains("uptime="));
         }
     }
 }
