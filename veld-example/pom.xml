@@ -60,6 +60,8 @@
     <properties>
         <!-- Skip deployment for example module -->
         <maven.deploy.skip>true</maven.deploy.skip>
+        <!-- Skip coverage check for example module -->
+        <jacoco.skip>true</jacoco.skip>
     </properties>
 
     <build>

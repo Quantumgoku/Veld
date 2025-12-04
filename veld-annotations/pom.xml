@@ -16,5 +16,12 @@
     <name>Veld Annotations</name>
     <description>Core annotations for Veld DI Framework</description>
 
-    <!-- No dependencies - pure annotations module -->
+    <dependencies>
+        <!-- Testing -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
 </project>
