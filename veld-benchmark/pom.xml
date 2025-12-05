@@ -134,12 +134,6 @@
                             <artifactId>dagger-compiler</artifactId>
                             <version>${dagger.version}</version>
                         </path>
-                        <!-- Veld annotation processor -->
-                        <path>
-                            <groupId>com.veld</groupId>
-                            <artifactId>veld-processor</artifactId>
-                            <version>${project.version}</version>
-                        </path>
                     </annotationProcessorPaths>
                     <compilerArgs>
                         <arg>--add-opens</arg>
