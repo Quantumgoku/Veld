@@ -16,6 +16,7 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
+import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.benchmark.veld.VeldSimpleService;
 import com.veld.runtime.VeldContainer;
 import org.openjdk.jmh.annotations.*;
@@ -45,7 +46,7 @@ public class ThroughputBenchmark {
     
     @Setup(Level.Trial)
     public void setup() {
-        veldContainer = VeldContainer.create();
+        veldContainer = VeldBenchmarkHelper.createSimpleContainer();
         springContext = new AnnotationConfigApplicationContext(SpringConfig.class);
         guiceInjector = Guice.createInjector(new GuiceModule());
         daggerComponent = DaggerBenchmarkComponent.create();

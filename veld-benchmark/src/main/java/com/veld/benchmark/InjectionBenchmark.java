@@ -19,6 +19,7 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
+import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.benchmark.veld.VeldComplexService;
 import com.veld.benchmark.veld.VeldLogger;
 import com.veld.benchmark.veld.VeldSimpleService;
@@ -43,7 +44,8 @@ import java.util.concurrent.TimeUnit;
 public class InjectionBenchmark {
     
     // Containers - initialized once per benchmark
-    private VeldContainer veldContainer;
+    private VeldContainer veldSimpleContainer;
+    private VeldContainer veldComplexContainer;
     private AnnotationConfigApplicationContext springContext;
     private Injector guiceInjector;
     private BenchmarkComponent daggerComponent;
@@ -51,7 +53,8 @@ public class InjectionBenchmark {
     @Setup(Level.Trial)
     public void setup() {
         // Initialize all containers
-        veldContainer = VeldContainer.create();
+        veldSimpleContainer = VeldBenchmarkHelper.createSimpleContainer();
+        veldComplexContainer = VeldBenchmarkHelper.createComplexContainer();
         springContext = new AnnotationConfigApplicationContext(SpringConfig.class);
         guiceInjector = Guice.createInjector(new GuiceModule());
         daggerComponent = DaggerBenchmarkComponent.create();
@@ -68,7 +71,7 @@ public class InjectionBenchmark {
     
     @Benchmark
     public void veldSimpleInjection(Blackhole bh) {
-        Service service = veldContainer.get(VeldSimpleService.class);
+        Service service = veldSimpleContainer.get(VeldSimpleService.class);
         bh.consume(service);
     }
     
@@ -94,7 +97,7 @@ public class InjectionBenchmark {
     
     @Benchmark
     public void veldComplexInjection(Blackhole bh) {
-        ComplexService service = veldContainer.get(VeldComplexService.class);
+        Service service = veldComplexContainer.get(VeldComplexService.class);
         bh.consume(service);
     }
     
@@ -140,7 +143,7 @@ public class InjectionBenchmark {
     
     @Benchmark
     public void veldLoggerLookup(Blackhole bh) {
-        Logger logger = veldContainer.get(VeldLogger.class);
+        Logger logger = veldSimpleContainer.get(Logger.class);
         bh.consume(logger);
     }
     

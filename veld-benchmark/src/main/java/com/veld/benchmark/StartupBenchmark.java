@@ -15,6 +15,7 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
+import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.runtime.VeldContainer;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
@@ -40,7 +41,7 @@ public class StartupBenchmark {
     
     @Benchmark
     public void veldStartup(Blackhole bh) {
-        VeldContainer container = VeldContainer.create();
+        VeldContainer container = VeldBenchmarkHelper.createSimpleContainer();
         bh.consume(container);
     }
     

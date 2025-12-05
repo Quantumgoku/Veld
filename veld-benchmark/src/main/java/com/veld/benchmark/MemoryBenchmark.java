@@ -15,6 +15,7 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
+import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.runtime.VeldContainer;
 import org.openjdk.jmh.annotations.*;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -44,7 +45,7 @@ public class MemoryBenchmark {
     public Object[] veldMemory() {
         Object[] containers = new Object[containerCount];
         for (int i = 0; i < containerCount; i++) {
-            containers[i] = VeldContainer.create();
+            containers[i] = VeldBenchmarkHelper.createSimpleContainer();
         }
         return containers;
     }
