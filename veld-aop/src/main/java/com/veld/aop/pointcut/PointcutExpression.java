@@ -142,9 +142,14 @@ public class PointcutExpression {
 
     private Pattern compileWithinPattern(String patternStr) {
         String regex = patternStr
-                .replace(".", "\\.")
+                // First, handle .. before escaping dots
                 .replace("..", "@@DOTDOT@@")
+                // Escape special regex characters
+                .replace(".", "\\.")
+                .replace("$", "\\$")
+                // Handle * (any class name, including inner classes with $)
                 .replace("*", "[^.]*")
+                // Restore ..
                 .replace("@@DOTDOT@@", ".*");
         
         return Pattern.compile("^" + regex);
