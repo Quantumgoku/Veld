@@ -19,13 +19,9 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
-import com.veld.benchmark.veld.FastBenchmarkHelper;
-import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.benchmark.veld.VeldComplexService;
-import com.veld.benchmark.veld.VeldLogger;
 import com.veld.benchmark.veld.VeldSimpleService;
 import com.veld.runtime.VeldContainer;
-import com.veld.runtime.fast.FastContainer;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -46,28 +42,35 @@ import java.util.concurrent.TimeUnit;
 public class InjectionBenchmark {
     
     // Containers - initialized once per benchmark
-    private VeldContainer veldSimpleContainer;
-    private VeldContainer veldComplexContainer;
-    private FastContainer fastSimpleContainer;
-    private FastContainer fastComplexContainer;
+    private VeldContainer veldContainer;
     private AnnotationConfigApplicationContext springContext;
     private Injector guiceInjector;
     private BenchmarkComponent daggerComponent;
     
+    // Pre-computed indices for fast access
+    private int simpleServiceIndex;
+    private int complexServiceIndex;
+    private int loggerIndex;
+    
     @Setup(Level.Trial)
     public void setup() {
-        // Initialize all containers
-        veldSimpleContainer = VeldBenchmarkHelper.createSimpleContainer();
-        veldComplexContainer = VeldBenchmarkHelper.createComplexContainer();
-        fastSimpleContainer = FastBenchmarkHelper.createSimpleContainer();
-        fastComplexContainer = FastBenchmarkHelper.createComplexContainer();
+        // Uses generated registry from annotation processor
+        veldContainer = new VeldContainer();
         springContext = new AnnotationConfigApplicationContext(SpringConfig.class);
         guiceInjector = Guice.createInjector(new GuiceModule());
         daggerComponent = DaggerBenchmarkComponent.create();
+        
+        // Pre-compute indices for fast benchmarks
+        simpleServiceIndex = veldContainer.indexFor(VeldSimpleService.class);
+        complexServiceIndex = veldContainer.indexFor(VeldComplexService.class);
+        loggerIndex = veldContainer.indexFor(Logger.class);
     }
     
     @TearDown(Level.Trial)
     public void teardown() {
+        if (veldContainer != null) {
+            veldContainer.close();
+        }
         if (springContext != null) {
             springContext.close();
         }
@@ -77,13 +80,13 @@ public class InjectionBenchmark {
     
     @Benchmark
     public void veldSimpleInjection(Blackhole bh) {
-        Service service = veldSimpleContainer.get(VeldSimpleService.class);
+        Service service = veldContainer.get(VeldSimpleService.class);
         bh.consume(service);
     }
     
     @Benchmark
     public void veldFastSimpleInjection(Blackhole bh) {
-        Service service = fastSimpleContainer.get(VeldSimpleService.class);
+        Service service = veldContainer.fastGet(simpleServiceIndex);
         bh.consume(service);
     }
     
@@ -109,13 +112,13 @@ public class InjectionBenchmark {
     
     @Benchmark
     public void veldComplexInjection(Blackhole bh) {
-        Service service = veldComplexContainer.get(VeldComplexService.class);
+        Service service = veldContainer.get(VeldComplexService.class);
         bh.consume(service);
     }
     
     @Benchmark
     public void veldFastComplexInjection(Blackhole bh) {
-        Service service = fastComplexContainer.get(VeldComplexService.class);
+        Service service = veldContainer.fastGet(complexServiceIndex);
         bh.consume(service);
     }
     
@@ -161,13 +164,13 @@ public class InjectionBenchmark {
     
     @Benchmark
     public void veldLoggerLookup(Blackhole bh) {
-        Logger logger = veldSimpleContainer.get(Logger.class);
+        Logger logger = veldContainer.get(Logger.class);
         bh.consume(logger);
     }
     
     @Benchmark
     public void veldFastLoggerLookup(Blackhole bh) {
-        Logger logger = fastSimpleContainer.get(Logger.class);
+        Logger logger = veldContainer.fastGet(loggerIndex);
         bh.consume(logger);
     }
     

@@ -3,7 +3,6 @@ package com.veld.benchmark;
 import com.veld.benchmark.common.Service;
 import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
-import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.benchmark.veld.VeldSimpleService;
 import com.veld.runtime.VeldContainer;
 
@@ -23,7 +22,7 @@ public class QuickPerformanceTest {
         System.out.println("Initializing containers...");
         
         long startVeld = System.nanoTime();
-        VeldContainer veldContainer = VeldBenchmarkHelper.createSimpleContainer();
+        VeldContainer veldContainer = new VeldContainer();
         long veldInitTime = System.nanoTime() - startVeld;
         
         long startDagger = System.nanoTime();
