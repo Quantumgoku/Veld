@@ -17,12 +17,8 @@ import com.veld.benchmark.dagger.DaggerPrototypeComponent;
 import com.veld.benchmark.dagger.PrototypeComponent;
 import com.veld.benchmark.guice.GuicePrototypeModule;
 import com.veld.benchmark.spring.SpringPrototypeConfig;
-import com.veld.benchmark.veld.FastBenchmarkHelper;
-import com.veld.benchmark.veld.VeldBenchmarkHelper;
-import com.veld.benchmark.veld.VeldSimpleService;
-import com.veld.benchmark.veld.VeldComplexService;
+import com.veld.benchmark.veld.VeldPrototypeService;
 import com.veld.runtime.VeldContainer;
-import com.veld.runtime.fast.FastContainer;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -44,22 +40,29 @@ import java.util.concurrent.TimeUnit;
 public class PrototypeBenchmark {
     
     private VeldContainer veldContainer;
-    private FastContainer fastContainer;
     private AnnotationConfigApplicationContext springContext;
     private Injector guiceInjector;
     private PrototypeComponent daggerComponent;
     
+    // Pre-computed index for fast access
+    private int prototypeIndex;
+    
     @Setup(Level.Trial)
     public void setup() {
-        veldContainer = VeldBenchmarkHelper.createPrototypeContainer();
-        fastContainer = FastBenchmarkHelper.createPrototypeContainer();
+        veldContainer = new VeldContainer();
         springContext = new AnnotationConfigApplicationContext(SpringPrototypeConfig.class);
         guiceInjector = Guice.createInjector(new GuicePrototypeModule());
         daggerComponent = DaggerPrototypeComponent.create();
+        
+        // Pre-compute index for fast benchmarks
+        prototypeIndex = veldContainer.indexFor(VeldPrototypeService.class);
     }
     
     @TearDown(Level.Trial)
     public void teardown() {
+        if (veldContainer != null) {
+            veldContainer.close();
+        }
         if (springContext != null) {
             springContext.close();
         }
@@ -69,13 +72,13 @@ public class PrototypeBenchmark {
     
     @Benchmark
     public void veldPrototypeSimple(Blackhole bh) {
-        Service service = veldContainer.get(VeldSimpleService.class);
+        Service service = veldContainer.get(VeldPrototypeService.class);
         bh.consume(service);
     }
     
     @Benchmark
     public void veldFastPrototypeSimple(Blackhole bh) {
-        Service service = fastContainer.get(VeldSimpleService.class);
+        Service service = veldContainer.fastGet(prototypeIndex);
         bh.consume(service);
     }
     

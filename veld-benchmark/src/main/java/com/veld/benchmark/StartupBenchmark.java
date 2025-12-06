@@ -15,10 +15,7 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
-import com.veld.benchmark.veld.FastBenchmarkHelper;
-import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.runtime.VeldContainer;
-import com.veld.runtime.fast.FastContainer;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -43,14 +40,9 @@ public class StartupBenchmark {
     
     @Benchmark
     public void veldStartup(Blackhole bh) {
-        VeldContainer container = VeldBenchmarkHelper.createSimpleContainer();
+        VeldContainer container = new VeldContainer();
         bh.consume(container);
-    }
-    
-    @Benchmark
-    public void veldFastStartup(Blackhole bh) {
-        FastContainer container = FastBenchmarkHelper.createSimpleContainer();
-        bh.consume(container);
+        container.close();
     }
     
     // ==================== SPRING ====================

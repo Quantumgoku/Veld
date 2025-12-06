@@ -16,11 +16,8 @@ import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
 import com.veld.benchmark.guice.GuiceModule;
 import com.veld.benchmark.spring.SpringConfig;
-import com.veld.benchmark.veld.FastBenchmarkHelper;
-import com.veld.benchmark.veld.VeldBenchmarkHelper;
 import com.veld.benchmark.veld.VeldSimpleService;
 import com.veld.runtime.VeldContainer;
-import com.veld.runtime.fast.FastContainer;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 import org.springframework.context.annotation.AnnotationConfigApplicationContext;
@@ -42,7 +39,6 @@ import java.util.concurrent.TimeUnit;
 public class ThroughputBenchmark {
     
     private VeldContainer veldContainer;
-    private FastContainer fastContainer;
     private AnnotationConfigApplicationContext springContext;
     private Injector guiceInjector;
     private BenchmarkComponent daggerComponent;
@@ -52,20 +48,23 @@ public class ThroughputBenchmark {
     
     @Setup(Level.Trial)
     public void setup() {
-        veldContainer = VeldBenchmarkHelper.createSimpleContainer();
-        fastContainer = FastBenchmarkHelper.createSimpleContainer();
+        // Uses generated registry from annotation processor
+        veldContainer = new VeldContainer();
         springContext = new AnnotationConfigApplicationContext(SpringConfig.class);
         guiceInjector = Guice.createInjector(new GuiceModule());
         daggerComponent = DaggerBenchmarkComponent.create();
         
         // Pre-compute index for ultra-fast benchmarks
-        serviceIndex = fastContainer.indexFor(VeldSimpleService.class);
+        serviceIndex = veldContainer.indexFor(VeldSimpleService.class);
         // Ensure singleton is initialized (eager)
-        fastContainer.get(VeldSimpleService.class);
+        veldContainer.get(VeldSimpleService.class);
     }
     
     @TearDown(Level.Trial)
     public void teardown() {
+        if (veldContainer != null) {
+            veldContainer.close();
+        }
         if (springContext != null) {
             springContext.close();
         }
@@ -73,25 +72,23 @@ public class ThroughputBenchmark {
     
     // ==================== THROUGHPUT BENCHMARKS ====================
     
+    /**
+     * Standard Veld lookup using get(Class).
+     * Uses IdentityHashMap lookup + array access.
+     */
     @Benchmark
     public void veldThroughput(Blackhole bh) {
         Service service = veldContainer.get(VeldSimpleService.class);
         bh.consume(service);
     }
     
-    @Benchmark
-    public void veldFastThroughput(Blackhole bh) {
-        Service service = fastContainer.get(VeldSimpleService.class);
-        bh.consume(service);
-    }
-    
     /**
-     * Ultra-fast direct array access using pre-computed index.
-     * This is the fastest possible - direct array[index] access.
+     * Ultra-fast Veld lookup using pre-computed index.
+     * Direct array[index] access - fastest possible.
      */
     @Benchmark
-    public void veldUltraFastThroughput(Blackhole bh) {
-        Service service = fastContainer.fastGet(serviceIndex);
+    public void veldFastThroughput(Blackhole bh) {
+        Service service = veldContainer.fastGet(serviceIndex);
         bh.consume(service);
     }
     
@@ -125,17 +122,7 @@ public class ThroughputBenchmark {
     @Benchmark
     @Threads(4)
     public void veldFastConcurrentThroughput(Blackhole bh) {
-        Service service = fastContainer.get(VeldSimpleService.class);
-        bh.consume(service);
-    }
-    
-    /**
-     * Ultra-fast concurrent throughput - direct array access.
-     */
-    @Benchmark
-    @Threads(4)
-    public void veldUltraFastConcurrentThroughput(Blackhole bh) {
-        Service service = fastContainer.fastGet(serviceIndex);
+        Service service = veldContainer.fastGet(serviceIndex);
         bh.consume(service);
     }
     
