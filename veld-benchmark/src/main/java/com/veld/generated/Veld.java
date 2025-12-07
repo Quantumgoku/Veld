@@ -1,72 +1,85 @@
-/*
- * Copyright 2024 Veld Framework
- *
- * Simulated generated class - exactly matches what VeldBootstrapGenerator produces.
- * Uses <clinit> static initialization for maximum performance.
- * THIS IS THE CONTAINER - ultra-fast with complete functionality.
- */
-package com.veld.benchmark.veld;
+package com.veld.generated;
 
 import java.util.ArrayList;
 import java.util.List;
 
+import com.veld.benchmark.veld.*;
+
 /**
- * Ultra-fast DI container - same pattern as generated code.
- * No separate container class needed.
+ * Ultra-fast DI container - manually written to match VeldSourceGenerator output.
+ * All singletons initialized in static block (thread-safe, zero runtime overhead).
+ * 
+ * This is what VeldSourceGenerator produces for real projects.
+ * For benchmarks, we use this manual version to avoid circular dependency with the processor.
  */
 public final class Veld {
-    
+
     // === SINGLETON FIELDS (static final = JIT inlines) ===
     private static final VeldLogger _veldLogger;
     private static final VeldValidator _veldValidator;
     private static final VeldRepository _veldRepository;
     private static final VeldSimpleService _veldSimpleService;
     private static final VeldComplexService _veldComplexService;
-    
-    // === LOOKUP ARRAYS (for get(Class) and getAll(Class)) ===
+
+    // === LOOKUP ARRAYS ===
     private static final Class<?>[] _types;
     private static final Object[] _instances;
-    
-    // <clinit> - JVM guarantees thread-safe initialization
+
+    // === STATIC INITIALIZER (JVM guarantees thread-safety) ===
     static {
-        // Topologically sorted - dependencies first
         _veldLogger = new VeldLogger();
         _veldValidator = new VeldValidator();
         _veldRepository = new VeldRepository();
         _veldSimpleService = new VeldSimpleService(_veldLogger);
         _veldComplexService = new VeldComplexService(_veldRepository, _veldLogger, _veldValidator);
-        
-        // Initialize lookup arrays
+
         _types = new Class<?>[] {
             VeldLogger.class,
+            com.veld.benchmark.common.Logger.class,
             VeldValidator.class,
             VeldRepository.class,
             VeldSimpleService.class,
+            com.veld.benchmark.common.Service.class,
             VeldComplexService.class
         };
         _instances = new Object[] {
             _veldLogger,
+            _veldLogger,
             _veldValidator,
             _veldRepository,
+            _veldSimpleService,
             _veldSimpleService,
             _veldComplexService
         };
     }
-    
+
     private Veld() {}
-    
-    // === DIRECT GETTERS (ultra-fast: getstatic + areturn = 2 instructions) ===
-    public static VeldLogger veldLogger() { return _veldLogger; }
-    public static VeldValidator veldValidator() { return _veldValidator; }
-    public static VeldRepository veldRepository() { return _veldRepository; }
-    public static VeldSimpleService veldSimpleService() { return _veldSimpleService; }
-    public static VeldComplexService veldComplexService() { return _veldComplexService; }
-    
+
+    // === DIRECT GETTERS (ultra-fast) ===
+    public static VeldLogger veldLogger() {
+        return _veldLogger;
+    }
+
+    public static VeldValidator veldValidator() {
+        return _veldValidator;
+    }
+
+    public static VeldRepository veldRepository() {
+        return _veldRepository;
+    }
+
+    public static VeldSimpleService veldSimpleService() {
+        return _veldSimpleService;
+    }
+
+    public static VeldComplexService veldComplexService() {
+        return _veldComplexService;
+    }
+
     // === CONTAINER API ===
-    
+
     @SuppressWarnings("unchecked")
     public static <T> T get(Class<T> type) {
-        // O(n) scan - ultra-fast for small n, no Maps
         for (int i = 0; i < _types.length; i++) {
             if (_types[i] == type) {
                 return (T) _instances[i];
@@ -74,7 +87,7 @@ public final class Veld {
         }
         return null;
     }
-    
+
     @SuppressWarnings("unchecked")
     public static <T> List<T> getAll(Class<T> type) {
         List<T> result = new ArrayList<>();
@@ -85,12 +98,12 @@ public final class Veld {
         }
         return result;
     }
-    
+
     public static boolean contains(Class<?> type) {
         return get(type) != null;
     }
-    
+
     public static int componentCount() {
-        return _types.length;
+        return 5;
     }
 }
