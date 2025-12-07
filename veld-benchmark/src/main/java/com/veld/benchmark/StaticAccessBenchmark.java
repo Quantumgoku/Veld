@@ -3,8 +3,7 @@ package com.veld.benchmark;
 import com.veld.benchmark.common.Service;
 import com.veld.benchmark.dagger.BenchmarkComponent;
 import com.veld.benchmark.dagger.DaggerBenchmarkComponent;
-import com.veld.benchmark.veld.Veld;
-import com.veld.benchmark.veld.VeldSimpleService;
+import com.veld.generated.Veld;
 import org.openjdk.jmh.annotations.*;
 import org.openjdk.jmh.infra.Blackhole;
 
@@ -34,7 +33,7 @@ public class StaticAccessBenchmark {
     @Benchmark
     public void veldStaticAccess(Blackhole bh) {
         // DIRECT static call - same as Dagger, no MethodHandle
-        VeldSimpleService service = Veld.veldSimpleService();
+        Object service = Veld.veldSimpleService();
         bh.consume(service);
     }
     

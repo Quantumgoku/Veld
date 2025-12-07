@@ -15,9 +15,11 @@ import javax.lang.model.util.Elements;
 import javax.lang.model.util.Types;
 import javax.tools.Diagnostic;
 import javax.tools.FileObject;
+import javax.tools.JavaFileObject;
 import javax.tools.StandardLocation;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.io.Writer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -917,19 +919,31 @@ public class VeldProcessor extends AbstractProcessor {
     
     private void generateRegistry() {
         try {
-            // Generate VeldRegistry bytecode (standard container)
+            // Generate VeldRegistry bytecode (standard container - for compatibility)
             RegistryGenerator registryGen = new RegistryGenerator(discoveredComponents);
             byte[] registryBytecode = registryGen.generate();
             writeClassFile(registryGen.getRegistryClassName(), registryBytecode);
             note("Generated VeldRegistry with " + discoveredComponents.size() + " components");
             
-            // Generate Veld bootstrap class bytecode (ULTRA-FAST static access)
-            VeldBootstrapGenerator bootstrapGen = new VeldBootstrapGenerator(discoveredComponents);
-            byte[] bootstrapBytecode = bootstrapGen.generate();
-            writeClassFile(bootstrapGen.getClassName(), bootstrapBytecode);
-            note("Generated Veld bootstrap class with static accessors");
+            // Generate Veld.java source code (ULTRA-FAST static access)
+            VeldSourceGenerator sourceGen = new VeldSourceGenerator(discoveredComponents);
+            String sourceCode = sourceGen.generate();
+            writeJavaSource(sourceGen.getFullClassName(), sourceCode);
+            note("Generated Veld.java with static accessors");
         } catch (IOException e) {
             error(null, "Failed to generate VeldRegistry: " + e.getMessage());
+        }
+    }
+    
+    private void writeJavaSource(String className, String sourceCode) throws IOException {
+        try {
+            JavaFileObject sourceFile = filer.createSourceFile(className);
+            try (Writer writer = sourceFile.openWriter()) {
+                writer.write(sourceCode);
+            }
+        } catch (javax.annotation.processing.FilerException e) {
+            // File already exists (e.g., manual Veld.java for benchmarks) - skip
+            note("Skipping " + className + " generation - file already exists");
         }
     }
     
