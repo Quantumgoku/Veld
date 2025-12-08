@@ -2,6 +2,7 @@ package com.veld.boot.example.service;
 
 import com.veld.annotation.Component;
 import com.veld.annotation.Inject;
+import com.veld.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
