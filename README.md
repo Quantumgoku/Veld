@@ -495,16 +495,16 @@ public class MyService {
 }
 ```
 
-### Container Methods
+### Veld API Methods
 
 ```java
-VeldContainer container = new VeldContainer();
-
 // Returns null if not found
-CacheService cache = container.tryGet(CacheService.class);
+CacheService cache = Veld.get(CacheService.class);
 
-// Returns Optional.empty() if not found
-Optional<MetricsService> metrics = container.getOptional(MetricsService.class);
+// Check if component exists
+if (Veld.contains(MetricsService.class)) {
+    MetricsService metrics = Veld.metricsService();
+}
 ```
 
 ## Conditional Configuration
