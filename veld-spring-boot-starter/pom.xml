@@ -18,7 +18,7 @@
 
     <properties>
         <spring.boot.version>2.7.18</spring.boot.version>
-        <spring.boot.starter.version>2.7.18</spring.boot.starter.version>
+        <spring.framework.version>5.3.31</spring.framework.version>
     </properties>
 
     <dependencies>
@@ -62,7 +62,7 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-context</artifactId>
-            <version>${spring.boot.version}</version>
+            <version>${spring.framework.version}</version>
         </dependency>
 
         <!-- Spring Boot Actuator (for health checks) -->
@@ -89,7 +89,7 @@
         <dependency>
             <groupId>org.springframework</groupId>
             <artifactId>spring-test</artifactId>
-            <version>${spring.boot.version}</version>
+            <version>${spring.framework.version}</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
