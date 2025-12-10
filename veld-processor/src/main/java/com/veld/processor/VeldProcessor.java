@@ -282,6 +282,7 @@ public class VeldProcessor extends AbstractProcessor {
         analyzeFields(typeElement, info);
         analyzeMethods(typeElement, info);
         analyzeLifecycle(typeElement, info);
+        analyzeEventSubscribers(typeElement, info);
         
         // Analyze implemented interfaces for interface-based injection
         analyzeInterfaces(typeElement, info);
@@ -1001,7 +1002,22 @@ public class VeldProcessor extends AbstractProcessor {
         sb.append(String.join("@", methods)).append("||");
         
         // interfaces: iface1,iface2
-        sb.append(String.join(",", comp.getImplementedInterfaces()));
+        sb.append(String.join(",", comp.getImplementedInterfaces())).append("||");
+        
+        // postConstruct: methodName~descriptor (or empty)
+        if (comp.hasPostConstruct()) {
+            sb.append(comp.getPostConstructMethod()).append("~").append(comp.getPostConstructDescriptor());
+        }
+        sb.append("||");
+        
+        // preDestroy: methodName~descriptor (or empty)
+        if (comp.hasPreDestroy()) {
+            sb.append(comp.getPreDestroyMethod()).append("~").append(comp.getPreDestroyDescriptor());
+        }
+        sb.append("||");
+        
+        // hasSubscribeMethods: true/false
+        sb.append(comp.hasSubscribeMethods());
         
         return sb.toString();
     }
@@ -1048,6 +1064,32 @@ public class VeldProcessor extends AbstractProcessor {
     
     private void note(String message) {
         messager.printMessage(Diagnostic.Kind.NOTE, "[Veld] " + message);
+    }
+    
+    /**
+     * Analyzes methods annotated with @Subscribe for EventBus registration.
+     */
+    private void analyzeEventSubscribers(TypeElement typeElement, ComponentInfo info) {
+        TypeElement subscribeAnnotation = elementUtils.getTypeElement("com.veld.annotation.Subscribe");
+        if (subscribeAnnotation == null) {
+            return; // @Subscribe annotation not available
+        }
+        
+        for (Element enclosed : typeElement.getEnclosedElements()) {
+            if (enclosed.getKind() != ElementKind.METHOD) continue;
+            
+            ExecutableElement method = (ExecutableElement) enclosed;
+            
+            // Check for @Subscribe annotation
+            for (AnnotationMirror annotation : method.getAnnotationMirrors()) {
+                String annotationName = annotation.getAnnotationType().asElement().toString();
+                if (annotationName.equals("com.veld.annotation.Subscribe")) {
+                    info.setHasSubscribeMethods(true);
+                    note("  -> EventBus subscriber: " + method.getSimpleName());
+                    return; // Only need to find one
+                }
+            }
+        }
     }
     
     private static class ProcessingException extends Exception {
