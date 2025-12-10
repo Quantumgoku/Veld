@@ -86,6 +86,7 @@ public class VeldClassGenerator implements Opcodes {
         generateGetAllByClass(cw);
         generateContains(cw);
         generateComponentCount(cw);
+        generateShutdown(cw, singletons);
         
         cw.visitEnd();
         return cw.toByteArray();
@@ -149,6 +150,22 @@ public class VeldClassGenerator implements Opcodes {
                     loadDependency(mv, depType);
                 }
                 mv.visitMethodInsn(INVOKEVIRTUAL, comp.internalName, method.name, method.descriptor, false);
+            }
+            
+            // EventBus registration (if has @Subscribe methods)
+            if (comp.hasSubscribeMethods) {
+                mv.visitMethodInsn(INVOKESTATIC, "com/veld/runtime/event/EventBus", "getInstance", 
+                    "()Lcom/veld/runtime/event/EventBus;", false);
+                mv.visitFieldInsn(GETSTATIC, VELD_CLASS, fieldName, fieldType);
+                mv.visitMethodInsn(INVOKEVIRTUAL, "com/veld/runtime/event/EventBus", "register", 
+                    "(Ljava/lang/Object;)V", false);
+            }
+            
+            // @PostConstruct callback
+            if (comp.postConstructMethod != null) {
+                mv.visitFieldInsn(GETSTATIC, VELD_CLASS, fieldName, fieldType);
+                mv.visitMethodInsn(INVOKEVIRTUAL, comp.internalName, comp.postConstructMethod, 
+                    comp.postConstructDescriptor, false);
             }
         }
         
@@ -366,6 +383,22 @@ public class VeldClassGenerator implements Opcodes {
             mv.visitMethodInsn(INVOKEVIRTUAL, comp.internalName, method.name, method.descriptor, false);
         }
         
+        // EventBus registration (if has @Subscribe methods)
+        if (comp.hasSubscribeMethods) {
+            mv.visitMethodInsn(INVOKESTATIC, "com/veld/runtime/event/EventBus", "getInstance", 
+                "()Lcom/veld/runtime/event/EventBus;", false);
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, "com/veld/runtime/event/EventBus", "register", 
+                "(Ljava/lang/Object;)V", false);
+        }
+        
+        // @PostConstruct callback
+        if (comp.postConstructMethod != null) {
+            mv.visitVarInsn(ALOAD, 0);
+            mv.visitMethodInsn(INVOKEVIRTUAL, comp.internalName, comp.postConstructMethod, 
+                comp.postConstructDescriptor, false);
+        }
+        
         mv.visitVarInsn(ALOAD, 0);
         mv.visitInsn(ARETURN);
         mv.visitMaxs(0, 0);
@@ -548,6 +581,28 @@ public class VeldClassGenerator implements Opcodes {
         mv.visitEnd();
     }
     
+    private void generateShutdown(ClassWriter cw, List<ComponentMeta> singletons) {
+        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC | ACC_STATIC, "shutdown", "()V", null, null);
+        mv.visitCode();
+        
+        // Call @PreDestroy on all singletons (in reverse order)
+        for (int i = singletons.size() - 1; i >= 0; i--) {
+            ComponentMeta comp = singletons.get(i);
+            if (comp.preDestroyMethod != null) {
+                String fieldName = getFieldName(comp);
+                String fieldType = "L" + comp.internalName + ";";
+                
+                mv.visitFieldInsn(GETSTATIC, VELD_CLASS, fieldName, fieldType);
+                mv.visitMethodInsn(INVOKEVIRTUAL, comp.internalName, comp.preDestroyMethod, 
+                    comp.preDestroyDescriptor, false);
+            }
+        }
+        
+        mv.visitInsn(RETURN);
+        mv.visitMaxs(0, 0);
+        mv.visitEnd();
+    }
+    
     private ComponentMeta findComponentByType(String internalName) {
         for (ComponentMeta comp : components) {
             if (comp.internalName.equals(internalName)) return comp;
@@ -611,10 +666,18 @@ public class VeldClassGenerator implements Opcodes {
         public final List<FieldInjectionMeta> fieldInjections;
         public final List<MethodInjectionMeta> methodInjections;
         public final List<String> interfaces;
+        public final String postConstructMethod;
+        public final String postConstructDescriptor;
+        public final String preDestroyMethod;
+        public final String preDestroyDescriptor;
+        public final boolean hasSubscribeMethods;
         
         public ComponentMeta(String className, String scope, boolean lazy,
                             List<String> constructorDeps, List<FieldInjectionMeta> fieldInjections,
-                            List<MethodInjectionMeta> methodInjections, List<String> interfaces) {
+                            List<MethodInjectionMeta> methodInjections, List<String> interfaces,
+                            String postConstructMethod, String postConstructDescriptor,
+                            String preDestroyMethod, String preDestroyDescriptor,
+                            boolean hasSubscribeMethods) {
             this.className = className;
             this.internalName = className.replace('.', '/');
             this.scope = scope;
@@ -623,6 +686,11 @@ public class VeldClassGenerator implements Opcodes {
             this.fieldInjections = fieldInjections;
             this.methodInjections = methodInjections;
             this.interfaces = interfaces;
+            this.postConstructMethod = postConstructMethod;
+            this.postConstructDescriptor = postConstructDescriptor;
+            this.preDestroyMethod = preDestroyMethod;
+            this.preDestroyDescriptor = preDestroyDescriptor;
+            this.hasSubscribeMethods = hasSubscribeMethods;
         }
         
         public static ComponentMeta parse(String line) {
@@ -666,7 +734,37 @@ public class VeldClassGenerator implements Opcodes {
                 ifaces.addAll(Arrays.asList(parts[6].split(",")));
             }
             
-            return new ComponentMeta(className, scope, lazy, ctorDeps, fields, methods, ifaces);
+            // Parse postConstruct (index 7)
+            String postConstructMethod = null;
+            String postConstructDescriptor = null;
+            if (parts.length > 7 && !parts[7].isEmpty()) {
+                String[] pc = parts[7].split("~", 2);
+                if (pc.length >= 2) {
+                    postConstructMethod = pc[0];
+                    postConstructDescriptor = pc[1];
+                }
+            }
+            
+            // Parse preDestroy (index 8)
+            String preDestroyMethod = null;
+            String preDestroyDescriptor = null;
+            if (parts.length > 8 && !parts[8].isEmpty()) {
+                String[] pd = parts[8].split("~", 2);
+                if (pd.length >= 2) {
+                    preDestroyMethod = pd[0];
+                    preDestroyDescriptor = pd[1];
+                }
+            }
+            
+            // Parse hasSubscribeMethods (index 9)
+            boolean hasSubscribeMethods = false;
+            if (parts.length > 9 && !parts[9].isEmpty()) {
+                hasSubscribeMethods = Boolean.parseBoolean(parts[9]);
+            }
+            
+            return new ComponentMeta(className, scope, lazy, ctorDeps, fields, methods, ifaces,
+                postConstructMethod, postConstructDescriptor, preDestroyMethod, preDestroyDescriptor,
+                hasSubscribeMethods);
         }
     }
     
