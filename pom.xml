@@ -102,6 +102,7 @@
         <!-- Release properties -->
         <maven.compiler.release>17</maven.compiler.release>
         <skipTests>false</skipTests>
+        <skipGpg>true</skipGpg>
     </properties>
 
     <dependencyManagement>
