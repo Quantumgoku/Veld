@@ -63,4 +63,12 @@ public final class Veld {
         throw new IllegalStateException(
             "Veld not initialized. Ensure veld-maven-plugin is configured with <extensions>true</extensions>");
     }
+    
+    /**
+     * Shuts down the container, calling @PreDestroy on all singleton components.
+     */
+    public static void shutdown() {
+        throw new IllegalStateException(
+            "Veld not initialized. Ensure veld-maven-plugin is configured with <extensions>true</extensions>");
+    }
 }
