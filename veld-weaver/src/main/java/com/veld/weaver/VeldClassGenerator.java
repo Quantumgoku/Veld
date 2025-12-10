@@ -124,7 +124,13 @@ public class VeldClassGenerator implements Opcodes {
                 }
                 
                 mv.visitFieldInsn(GETSTATIC, VELD_CLASS, fieldName, fieldType);
-                loadDependency(mv, field.depType);
+                
+                if (field.isOptional) {
+                    // Optional<T> injection - wrap in Optional.of() or Optional.empty()
+                    loadOptionalDependency(mv, field.depType);
+                } else {
+                    loadDependency(mv, field.depType);
+                }
                 
                 if (!"PUBLIC".equals(field.visibility)) {
                     String setterName = SYNTHETIC_SETTER_PREFIX + field.name;
@@ -247,6 +253,32 @@ public class VeldClassGenerator implements Opcodes {
         }
     }
     
+    /**
+     * Loads an Optional<T> dependency.
+     * If the component exists, returns Optional.of(component), otherwise Optional.empty().
+     */
+    private void loadOptionalDependency(MethodVisitor mv, String typeName) {
+        String depInternal = typeName.replace('.', '/');
+        ComponentMeta depComp = findComponentByType(depInternal);
+        
+        if (depComp != null) {
+            // Component exists - wrap in Optional.of()
+            if ("SINGLETON".equals(depComp.scope)) {
+                mv.visitFieldInsn(GETSTATIC, VELD_CLASS, getFieldName(depComp),
+                    "L" + depComp.internalName + ";");
+            } else {
+                mv.visitMethodInsn(INVOKESTATIC, VELD_CLASS, getMethodName(depComp),
+                    "()L" + depComp.internalName + ";", false);
+            }
+            mv.visitMethodInsn(INVOKESTATIC, "java/util/Optional", "of",
+                "(Ljava/lang/Object;)Ljava/util/Optional;", false);
+        } else {
+            // Component doesn't exist - return Optional.empty()
+            mv.visitMethodInsn(INVOKESTATIC, "java/util/Optional", "empty",
+                "()Ljava/util/Optional;", false);
+        }
+    }
+    
     private List<TypeMapping> buildTypeMappings() {
         List<TypeMapping> mappings = new ArrayList<>();
         for (ComponentMeta comp : components) {
@@ -364,7 +396,11 @@ public class VeldClassGenerator implements Opcodes {
             }
             
             mv.visitVarInsn(ALOAD, 0);
-            loadDependency(mv, field.depType);
+            if (field.isOptional) {
+                loadOptionalDependency(mv, field.depType);
+            } else {
+                loadDependency(mv, field.depType);
+            }
             
             if (!"PUBLIC".equals(field.visibility)) {
                 String setterName = SYNTHETIC_SETTER_PREFIX + field.name;
@@ -709,9 +745,11 @@ public class VeldClassGenerator implements Opcodes {
             if (parts.length > 4 && !parts[4].isEmpty()) {
                 for (String f : parts[4].split("@")) {
                     if (f.isEmpty()) continue;
-                    String[] fp = f.split("~", 4); // use ~ as delimiter
+                    String[] fp = f.split("~", 6); // use ~ as delimiter
                     if (fp.length >= 4) {
-                        fields.add(new FieldInjectionMeta(fp[0], fp[1], fp[2], fp[3]));
+                        boolean isOptional = fp.length > 4 && Boolean.parseBoolean(fp[4]);
+                        boolean isProvider = fp.length > 5 && Boolean.parseBoolean(fp[5]);
+                        fields.add(new FieldInjectionMeta(fp[0], fp[1], fp[2], fp[3], isOptional, isProvider));
                     }
                 }
             }
@@ -770,15 +808,20 @@ public class VeldClassGenerator implements Opcodes {
     
     public static class FieldInjectionMeta {
         public final String name;
-        public final String depType;
+        public final String depType;      // actualType (the real type, not wrapper)
         public final String descriptor;
         public final String visibility;
+        public final boolean isOptional;  // true if Optional<T>
+        public final boolean isProvider;  // true if Provider<T>
         
-        public FieldInjectionMeta(String name, String depType, String descriptor, String visibility) {
+        public FieldInjectionMeta(String name, String depType, String descriptor, String visibility,
+                                  boolean isOptional, boolean isProvider) {
             this.name = name;
             this.depType = depType;
             this.descriptor = descriptor;
             this.visibility = visibility;
+            this.isOptional = isOptional;
+            this.isProvider = isProvider;
         }
     }
     
