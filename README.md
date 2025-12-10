@@ -2,17 +2,18 @@
 
 **Ultra-fast Dependency Injection for Java - Zero Reflection, Pure Bytecode Generation**
 
+[![Build Status](https://github.com/yasmramos/Veld/actions/workflows/maven.yml/badge.svg)](https://github.com/yasmramos/Veld/actions)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/Java-11%2B-orange.svg)](https://openjdk.java.net/)
 [![Maven](https://img.shields.io/badge/Maven-3.6%2B-red.svg)](https://maven.apache.org/)
 
-Veld is a **compile-time Dependency Injection framework** that generates pure bytecode using ASM. Zero reflection at runtime means **maximum performance** - up to 1000x faster than Spring for dependency resolution.
+Veld is a **compile-time Dependency Injection framework** that generates pure bytecode using ASM. Zero reflection at runtime means **maximum performance** - up to 100x faster than Spring for dependency resolution.
 
 ## Why Veld?
 
 | Feature | Veld | Spring | Guice |
 |---------|------|--------|-------|
-| **Reflection at runtime** | None | Heavy | Moderate |
+| **Reflection at runtime** | ❌ None | ✓ Heavy | ✓ Moderate |
 | **Startup time** | ~0.1ms | ~500ms+ | ~100ms |
 | **Injection speed** | ~0.001ms | ~0.01ms | ~0.005ms |
 | **Memory overhead** | Minimal | High | Moderate |
@@ -29,20 +30,23 @@ Veld is a **compile-time Dependency Injection framework** that generates pure by
 
 ### Scopes & Lifecycle
 - **Singleton** - Single instance per application (default)
-- **Prototype** - New instance on every request
+- **Prototype** - New instance on every request (`@Prototype`)
 - **Lazy Initialization** - `@Lazy` for deferred creation
-- **Conditional Registration** - `@ConditionalOnProperty`, `@ConditionalOnMissingBean`
+- **Lifecycle Callbacks** - `@PostConstruct` and `@PreDestroy` support
+- **Conditional Registration** - `@ConditionalOnProperty`, `@ConditionalOnMissingBean`, `@ConditionalOnClass`
 
 ### Standards Support
 - **JSR-330** - Full support for `javax.inject.*` annotations
 - **Jakarta Inject** - Full support for `jakarta.inject.*` annotations
 - **Mixed Usage** - Use both in the same project
 
-### Advanced
+### Advanced Features
 - **Named Injection** - `@Named` qualifier for disambiguation
 - **Value Injection** - `@Value` for configuration properties
 - **Provider Support** - `Provider<T>` for lazy/multiple instances
 - **AOP Support** - Aspect-oriented programming via `veld-aop` module
+- **EventBus** - Event-driven component communication with `@Subscribe`
+- **Profile Support** - `@Profile` for environment-specific beans
 - **JPMS Compatible** - Full Java Module System support
 
 ## Quick Start
@@ -55,14 +59,14 @@ Veld is a **compile-time Dependency Injection framework** that generates pure by
     <dependency>
         <groupId>io.github.yasmramos</groupId>
         <artifactId>veld-annotations</artifactId>
-        <version>1.0.0-alpha.6</version>
+        <version>1.0.0-SNAPSHOT</version>
     </dependency>
     
-    <!-- Runtime utilities (optional) -->
+    <!-- Runtime utilities -->
     <dependency>
         <groupId>io.github.yasmramos</groupId>
         <artifactId>veld-runtime</artifactId>
-        <version>1.0.0-alpha.6</version>
+        <version>1.0.0-SNAPSHOT</version>
     </dependency>
 </dependencies>
 ```
@@ -75,7 +79,7 @@ Veld is a **compile-time Dependency Injection framework** that generates pure by
         <plugin>
             <groupId>io.github.yasmramos</groupId>
             <artifactId>veld-maven-plugin</artifactId>
-            <version>1.0.0-alpha.6</version>
+            <version>1.0.0-SNAPSHOT</version>
             <extensions>true</extensions>
         </plugin>
     </plugins>
@@ -132,7 +136,7 @@ public class UserService {
 ### 4. Use Your Components
 
 ```java
-import io.github.yasmramos.generated.Veld;
+import io.github.yasmramos.Veld;
 
 public class Main {
     public static void main(String[] args) {
@@ -156,6 +160,7 @@ public class Main {
 | `@Prototype` | New instance per request | `@Prototype @Component public class Request {}` |
 | `@Lazy` | Deferred initialization | `@Lazy @Component public class HeavyService {}` |
 | `@Named` | Qualifier name | `@Named("primary") @Component public class PrimaryDB {}` |
+| `@Profile` | Environment-specific bean | `@Profile("dev") @Component public class DevConfig {}` |
 
 ### Injection
 
@@ -166,6 +171,17 @@ public class Main {
 | `@Inject` | Method | Method/setter injection |
 | `@Value` | Field | Configuration value injection |
 | `@Named` | Parameter/Field | Qualify by name |
+| `@Optional` | Field/Parameter | Mark dependency as optional |
+
+### Lifecycle
+
+| Annotation | Description |
+|------------|-------------|
+| `@PostConstruct` | Called after injection |
+| `@PreDestroy` | Called before destruction |
+| `@OnStart` | Called when application starts |
+| `@OnStop` | Called when application stops |
+| `@DependsOn` | Specify initialization order |
 
 ### Conditional
 
@@ -173,6 +189,26 @@ public class Main {
 |------------|-------------|
 | `@ConditionalOnProperty` | Register if property matches |
 | `@ConditionalOnMissingBean` | Register if no other impl exists |
+| `@ConditionalOnClass` | Register if class is present |
+
+### AOP (Aspect-Oriented Programming)
+
+| Annotation | Description |
+|------------|-------------|
+| `@Aspect` | Marks a class as an aspect |
+| `@Before` | Execute before method |
+| `@After` | Execute after method |
+| `@Around` | Wrap method execution |
+| `@AroundInvoke` | CDI-style interceptor |
+| `@Pointcut` | Define reusable pointcut |
+| `@Interceptor` | Mark as interceptor |
+| `@InterceptorBinding` | Custom interceptor binding |
+
+### Events
+
+| Annotation | Description |
+|------------|-------------|
+| `@Subscribe` | Subscribe to events via EventBus |
 
 ## Injection Patterns
 
@@ -278,6 +314,53 @@ public class AppConfig {
 }
 ```
 
+## EventBus
+
+Veld includes a built-in EventBus for decoupled component communication:
+
+```java
+@Component
+public class OrderEventHandler {
+    @Subscribe
+    public void onOrderCreated(OrderCreatedEvent event) {
+        System.out.println("Order created: " + event.getOrderId());
+    }
+}
+
+@Component
+public class OrderService {
+    public void createOrder(Order order) {
+        // ... create order
+        EventBus.getInstance().publish(new OrderCreatedEvent(order.getId()));
+    }
+}
+```
+
+## AOP Support
+
+Veld provides comprehensive AOP support via the `veld-aop` module:
+
+```java
+@Aspect
+@Component
+public class LoggingAspect {
+    
+    @Before("execution(* io.github.yasmramos.example.service.*.*(..))")
+    public void logBefore(JoinPoint jp) {
+        System.out.println("Calling: " + jp.getSignature());
+    }
+    
+    @Around("execution(* *..*Service.*(..))")
+    public Object measureTime(ProceedingJoinPoint pjp) throws Throwable {
+        long start = System.currentTimeMillis();
+        Object result = pjp.proceed();
+        long duration = System.currentTimeMillis() - start;
+        System.out.println("Method took: " + duration + "ms");
+        return result;
+    }
+}
+```
+
 ## Architecture
 
 Veld uses a **three-phase build process**:
@@ -288,7 +371,7 @@ Veld uses a **three-phase build process**:
 ├─────────────────────────────────────────────────────────────┤
 │  1. Annotation Processing                                    │
 │     - Discovers @Component classes                          │
-│     - Generates factory classes                             │
+│     - Analyzes injection points                             │
 │     - Writes component metadata                             │
 ├─────────────────────────────────────────────────────────────┤
 │  2. Bytecode Weaving                                        │
@@ -316,13 +399,32 @@ Veld uses a **three-phase build process**:
 
 | Module | Description |
 |--------|-------------|
-| `veld-annotations` | Core annotations (`@Component`, `@Inject`, etc.) |
-| `veld-runtime` | Runtime utilities and base classes |
+| `veld-annotations` | Core annotations (`@Component`, `@Inject`, `@Singleton`, etc.) |
+| `veld-runtime` | Runtime utilities, EventBus, lifecycle management |
 | `veld-processor` | Annotation processor (compile-time) |
 | `veld-weaver` | Bytecode weaver for synthetic setters |
 | `veld-maven-plugin` | **Unified plugin** - handles everything |
 | `veld-aop` | Aspect-Oriented Programming support |
 | `veld-spring-boot-starter` | Spring Boot integration |
+
+## Veld API
+
+```java
+// Get a component by type
+UserService userService = Veld.get(UserService.class);
+
+// Get a component by interface
+IUserRepository repo = Veld.get(IUserRepository.class);
+
+// Get all implementations of an interface
+List<DataSource> dataSources = Veld.getAll(DataSource.class);
+
+// Check if a component exists
+boolean exists = Veld.contains(MyService.class);
+
+// Get component count
+int count = Veld.componentCount();
+```
 
 ## Spring Boot Integration
 
@@ -332,7 +434,7 @@ Use Veld alongside Spring Boot:
 <dependency>
     <groupId>io.github.yasmramos</groupId>
     <artifactId>veld-spring-boot-starter</artifactId>
-    <version>1.0.0-alpha.6</version>
+    <version>1.0.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -365,21 +467,32 @@ Use Veld alongside Spring Boot:
 └────────────────────────────────────────────────────────────┘
 ```
 
-## Example Project
+## Example Projects
 
-See the [veld-example](veld-example/) module for a complete working example demonstrating:
-- All injection types
+### veld-example
+Complete working example demonstrating all features:
+- All injection types (constructor, field, method)
 - Scopes (singleton, prototype)
 - Interface binding
 - Named qualifiers
 - JSR-330 and Jakarta compatibility
 - Lazy initialization
 - Conditional beans
+- EventBus
+- AOP
+- Lifecycle management
 
-Run the example:
 ```bash
 cd veld-example
-mvn clean compile exec:java
+mvn clean compile exec:java -Dexec.mainClass="io.github.yasmramos.example.Main"
+```
+
+### veld-spring-boot-example
+Example showing Veld integration with Spring Boot.
+
+```bash
+cd veld-spring-boot-example
+mvn clean spring-boot:run
 ```
 
 ## Documentation
@@ -390,7 +503,16 @@ Full documentation available in [docs/](docs/):
 - [Core Features](docs/core-features.html)
 - [API Reference](docs/api.html)
 - [AOP Guide](docs/aop.html)
+- [EventBus](docs/eventbus.html)
 - [Examples](docs/examples.html)
+
+## Building from Source
+
+```bash
+git clone https://github.com/yasmramos/Veld.git
+cd Veld
+mvn clean install
+```
 
 ## Contributing
 
