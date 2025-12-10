@@ -979,13 +979,16 @@ public class VeldProcessor extends AbstractProcessor {
         }
         sb.append("||");
         
-        // field injections: fieldName~type~descriptor~visibility;...
+        // field injections: fieldName~actualType~descriptor~visibility~isOptional~isProvider;...
         List<String> fields = new ArrayList<>();
         for (InjectionPoint field : comp.getFieldInjections()) {
             if (!field.getDependencies().isEmpty()) {
                 InjectionPoint.Dependency dep = field.getDependencies().get(0);
-                fields.add(field.getName() + "~" + dep.getTypeName() + "~" + 
-                    field.getDescriptor() + "~" + field.getVisibility().name());
+                // Use actualTypeName for Optional<T>/Provider<T>, otherwise use typeName
+                String actualType = dep.getActualTypeName();
+                fields.add(field.getName() + "~" + actualType + "~" + 
+                    field.getDescriptor() + "~" + field.getVisibility().name() + "~" +
+                    dep.isOptionalWrapper() + "~" + dep.isProvider());
             }
         }
         sb.append(String.join("@", fields)).append("||");
