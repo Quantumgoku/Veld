@@ -241,16 +241,17 @@
                 <artifactId>maven-surefire-plugin</artifactId>
                 <version>${maven.surefire.plugin.version}</version>
                 <configuration>
-                    <argLine>@{argLine} -Dnet.bytebuddy.experimental=true 
-                        --add-opens java.base/java.lang=ALL-UNNAMED 
-                        --add-opens java.base/java.lang.reflect=ALL-UNNAMED 
-                        --add-opens java.base/java.util=ALL-UNNAMED 
-                        --add-opens java.base/java.lang.invoke=ALL-UNNAMED 
-                        --add-opens java.base/java.util.concurrent=ALL-UNNAMED
-                    </argLine>
+                    <argLine>-Dnet.bytebuddy.experimental=true</argLine>
                     <skipTests>${skipTests}</skipTests>
                     <testFailureIgnore>false</testFailureIgnore>
                     <failIfNoTests>false</failIfNoTests>
+                    <includes>
+                        <include>**/*Test.java</include>
+                        <include>**/*Tests.java</include>
+                    </includes>
+                    <excludes>
+                        <exclude>**/Abstract*.java</exclude>
+                    </excludes>
                 </configuration>
             </plugin>
 
