@@ -77,7 +77,7 @@ jobs:
         
         # Verificar que el proyecto compila
         echo "Verifying compilation..."
-        if mvn clean compile -q; then
+        if mvn clean compile -DskipGpg=true -q; then
           echo "✅ Compilation successful"
         else
           echo "❌ Compilation failed"
@@ -122,12 +122,12 @@ jobs:
     - name: 🔨 Build Project
       run: |
         echo "🔨 Building project with JDK ${{ matrix.java-version }}"
-        mvn clean install -DskipTests -q
+        mvn clean install -DskipTests -DskipGpg=true -q
         
     - name: 🧪 Test Project
       run: |
         echo "🧪 Testing project..."
-        mvn test -q
+        mvn test -DskipGpg=true -q
         
     - name: 📦 Upload Build Artifacts
       uses: actions/upload-artifact@v4
@@ -159,7 +159,7 @@ jobs:
     - name: 🔗 Run Integration Tests
       run: |
         echo "🔗 Running integration tests..."
-        mvn test -Dtest=*IT -q || echo "Integration tests completed"
+        mvn test -Dtest=*IT -DskipGpg=true -q || echo "Integration tests completed"
         
     - name: 📊 Upload Integration Reports
       uses: actions/upload-artifact@v4
@@ -190,7 +190,7 @@ jobs:
     - name: 📄 License Check
       run: |
         echo "📄 Checking license compliance..."
-        mvn license:check -q || echo "License check completed"
+        mvn license:check -DskipGpg=true -q || echo "License check completed"
         
     - name: 📊 Upload Security Reports
       uses: actions/upload-artifact@v4
@@ -221,14 +221,14 @@ jobs:
     - name: 🔨 Package Build
       run: |
         echo "🔨 Building package artifacts..."
-        mvn clean package -DskipTests -q
+        mvn clean package -DskipTests -DskipGpg=true -q
         
     - name: 📦 Create Distribution
       run: |
         echo "📦 Creating distribution packages..."
-        mvn assembly:single -DdescriptorId=jar-with-dependencies -q || true
-        mvn source:jar -q || true
-        mvn javadoc:jar -q || true
+        mvn assembly:single -DdescriptorId=jar-with-dependencies -DskipGpg=true -q || true
+        mvn source:jar -DskipGpg=true -q || true
+        mvn javadoc:jar -DskipGpg=true -q || true
         
     - name: 📊 Upload Release Artifacts
       uses: actions/upload-artifact@v4
