@@ -46,6 +46,16 @@ jobs:
         fi
         echo "SONATYPE_PASSWORD is set"
         
+        # Create settings.xml with credentials
+        mkdir -p ~/.m2
+        echo 'PHNldHRpbmdzIHhtbG5zPSJodHRwOi8vbWF2ZW4uYXBhY2hlLm9yZy9TRVRUSU5HUy8xLjAuMCIgeG1sbnM6eHNpPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxL1hNTFNjaGVtYS1pbnN0YW5jZSIgeHNpOnNjaGVtYUxvY2F0aW9uPSJodHRwOi8vbWF2ZW4uYXBhY2hlLm9yZy9TRVRUSU5HUy8xLjAuMCBodHRwczovL21hdmVuLmFwYWNoZS5vcmcveHNkL3NldHRpbmdzLTEuMC4wLnhzZCI+PHNlcnZlcnM+PHNlcnZlcj48aWQ+Y2VudHJhbDwvaWQ+PFVTRVJOQU1FX1BMQUNFSE9MREVSLz48UEFTU1dPUkRfUExBQ0VIT0xERVIvPjwvc2VydmVyPjwvc2VydmVycz48L3NldHRpbmdzPgo=' | base64 -d > ~/.m2/settings.xml
+        
+        # Replace placeholders with actual secrets
+        sed -i "s|<USERNAME_PLACEHOLDER/>|<username>${{ secrets.SONATYPE_USERNAME }}</username>|g" ~/.m2/settings.xml
+        sed -i "s|<PASSWORD_PLACEHOLDER/>|<password>${{ secrets.SONATYPE_PASSWORD }}</password>|g" ~/.m2/settings.xml
+        
+        echo "Maven settings.xml created successfully"
+        
         echo ""
         echo "Running Maven version..."
         mvn --version
