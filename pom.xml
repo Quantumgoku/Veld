@@ -141,7 +141,7 @@
 
         <!-- GraalVM versions -->
         <graalvm.version>22.3.2</graalvm.version>
-        <maven.javadoc.skip>false</maven.javadoc.skip>
+        <maven.javadoc.skip>true</maven.javadoc.skip>
         <build-helper.attach.phase>package</build-helper.attach.phase>
 
         <!-- CI/Benchmark properties -->
