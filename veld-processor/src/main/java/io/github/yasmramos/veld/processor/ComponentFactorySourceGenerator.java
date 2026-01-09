@@ -27,14 +27,16 @@ public final class ComponentFactorySourceGenerator {
     public String generate() {
         StringBuilder sb = new StringBuilder();
 
-        // All factories are generated in io.github.yasmramos.veld.gen package
-        String packageName = "io.github.yasmramos.veld.gen";
+        // Factory is generated in the same package as the original component
+        String packageName = component.getPackageName();
         String factoryClassName = component.getFactoryClassName();
-        // Extract simple name: io.github.yasmramos.veld.gen.io_github_pkg_Class$$VeldFactory -> io_github_pkg_Class$$VeldFactory
-        String factorySimpleName = factoryClassName.substring(packageName.length() + 1);
+        // Extract simple name: com.example.Component$$VeldFactory -> Component$$VeldFactory
+        String factorySimpleName = factoryClassName.substring(packageName.isEmpty() ? 0 : packageName.length() + 1);
 
         // Package declaration
-        sb.append("package ").append(packageName).append(";\n\n");
+        if (!packageName.isEmpty()) {
+            sb.append("package ").append(packageName).append(";\n\n");
+        }
 
         // Imports
         sb.append("import io.github.yasmramos.veld.Veld;\n");
