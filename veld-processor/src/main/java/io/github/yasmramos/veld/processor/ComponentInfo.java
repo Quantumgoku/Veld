@@ -69,6 +69,16 @@ public final class ComponentInfo {
     public String getClassName() {
         return className;
     }
+
+    /**
+     * Returns the package name of the component class.
+     * 
+     * @return the package name, or empty string if in default package
+     */
+    public String getPackageName() {
+        int lastDot = className.lastIndexOf('.');
+        return lastDot > 0 ? className.substring(0, lastDot) : "";
+    }
     
     /**
      * Sets the class name and updates internal name accordingly.
@@ -130,17 +140,14 @@ public final class ComponentInfo {
     }
     
     public String getFactoryClassName() {
-        // Generate all factories in io.github.yasmramos.veld.gen package with flattened names
-        // This avoids package conflicts and ensures correct compilation order
-        // Example: io.github.pkg.Class -> io.github.yasmramos.veld.gen.io_github_pkg_Class$$VeldFactory
-        String flattened = className.replace('.', '_').replace('$', '_');
-        return "io.github.yasmramos.veld.gen." + flattened + "$$VeldFactory";
+        // Generate factory in the same package as the original class
+        // Example: com.example.myapp.Component -> com.example.myapp.Component$$VeldFactory
+        return className + "$$VeldFactory";
     }
 
     public String getFactoryInternalName() {
         // Convert to internal format
-        String flattened = className.replace('.', '_').replace('$', '_');
-        return "io/github/yasmramos/veld/gen/" + flattened + "$$VeldFactory";
+        return className.replace('.', '/') + "$$VeldFactory";
     }
     
     public InjectionPoint getConstructorInjection() {
