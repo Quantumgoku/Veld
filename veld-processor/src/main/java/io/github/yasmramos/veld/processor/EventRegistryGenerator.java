@@ -130,8 +130,8 @@ public class EventRegistryGenerator {
             List<SubscriptionInfo> componentSubs = entry.getValue();
 
             registerEventsMethod.addComment("Subscriptions for $N", simpleName)
-                    .addStatement("if (component instanceof $T)", ClassName.get(componentClass))
-                    .addStatement("$T typed = ($T) component", ClassName.get(componentClass), ClassName.get(componentClass))
+                    .addStatement("if (component instanceof $T)", ClassName.bestGuess(componentClass))
+                    .addStatement("$T typed = ($T) component", ClassName.bestGuess(componentClass), ClassName.bestGuess(componentClass))
                     .beginControlFlow("");
 
             for (SubscriptionInfo sub : componentSubs) {
@@ -150,7 +150,7 @@ public class EventRegistryGenerator {
                 } else {
                     registration.append(")");
                 }
-                registerEventsMethod.addStatement(registration.toString(), ClassName.get(sub.eventTypeName));
+                registerEventsMethod.addStatement(registration.toString(), ClassName.bestGuess(sub.eventTypeName));
             }
 
             registerEventsMethod.endControlFlow().addCode("\n");

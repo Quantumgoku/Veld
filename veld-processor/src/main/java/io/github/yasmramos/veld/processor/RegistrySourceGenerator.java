@@ -2,6 +2,7 @@ package io.github.yasmramos.veld.processor;
 
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ClassName;
+import com.squareup.javapoet.CodeBlock;
 import com.squareup.javapoet.FieldSpec;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
@@ -9,12 +10,11 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
-import io.github.yasmramos.veld.VeldRegistry;
 import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.ComponentFactory;
 import io.github.yasmramos.veld.runtime.ComponentRegistry;
 
-import javax.annotation.processing.SuppressWarnings;
+import java.lang.SuppressWarnings;
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -106,7 +106,9 @@ public final class RegistrySourceGenerator {
     private void addStaticFields(TypeSpec.Builder classBuilder) {
         // TYPE_INDICES
         FieldSpec typeIndicesField = FieldSpec.builder(ParameterizedTypeName.get(
-                ClassName.get(IdentityHashMap.class), ClassName.get(Class.class), Integer.class), "TYPE_INDICES")
+                ClassName.get(IdentityHashMap.class),
+                ClassName.get(Class.class),
+                ClassName.get(Integer.class)), "TYPE_INDICES")
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
                 .initializer("new $T<>()", IdentityHashMap.class)
                 .build();
@@ -114,7 +116,9 @@ public final class RegistrySourceGenerator {
 
         // NAME_INDICES
         FieldSpec nameIndicesField = FieldSpec.builder(ParameterizedTypeName.get(
-                ClassName.get(HashMap.class), ClassName.get(String.class), Integer.class), "NAME_INDICES")
+                ClassName.get(HashMap.class),
+                ClassName.get(String.class),
+                ClassName.get(Integer.class)), "NAME_INDICES")
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
                 .initializer("new $T<>()", HashMap.class)
                 .build();
@@ -153,7 +157,7 @@ public final class RegistrySourceGenerator {
         // factoriesByType map
         FieldSpec factoriesByTypeField = FieldSpec.builder(ParameterizedTypeName.get(
                 ClassName.get(HashMap.class), ClassName.get(Class.class), ParameterizedTypeName.get(
-                        ClassName.get(ComponentFactory.class), TypeVariableName.get "?"))), "factoriesByType")
+                        ClassName.get(ComponentFactory.class), TypeVariableName.get("?"))), "factoriesByType")
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                 .initializer("new $T<>()", HashMap.class)
                 .build();
@@ -180,8 +184,6 @@ public final class RegistrySourceGenerator {
     }
 
     private void addStaticInitializer(TypeSpec.Builder classBuilder) {
-        MethodSpec staticInitializer = MethodSpec.staticInitializerBuilder().build();
-
         StringBuilder typeIndicesInit = new StringBuilder();
         for (int i = 0; i < components.size(); i++) {
             ComponentInfo comp = components.get(i);
@@ -228,19 +230,20 @@ public final class RegistrySourceGenerator {
             supertypeIndicesInit.append("});\n");
         }
 
-        // Build the static initializer with all statements
-        MethodSpec.Builder staticInitBuilder = MethodSpec.staticInitializerBuilder()
-                .addCode(typeIndicesInit.toString())
-                .addCode("\n")
-                .addCode(nameIndicesInit.toString())
-                .addCode("\n")
-                .addCode(scopesInit.toString())
-                .addCode("\n")
-                .addCode(lazyFlagsInit.toString())
-                .addCode("\n")
-                .addCode(supertypeIndicesInit.toString());
+        // Build the static initializer with all statements using CodeBlock
+        CodeBlock staticInitCode = CodeBlock.builder()
+                .add(typeIndicesInit.toString())
+                .add("\n")
+                .add(nameIndicesInit.toString())
+                .add("\n")
+                .add(scopesInit.toString())
+                .add("\n")
+                .add(lazyFlagsInit.toString())
+                .add("\n")
+                .add(supertypeIndicesInit.toString())
+                .build();
 
-        classBuilder.addInitializer(staticInitBuilder.build());
+        classBuilder.addStaticBlock(staticInitCode);
     }
 
     private void addConstructor(TypeSpec.Builder classBuilder) {
@@ -253,24 +256,24 @@ public final class RegistrySourceGenerator {
             // Instantiate the generated factory class for this component
             // Factory is in the same package as the original component
             String factoryClassName = comp.getFactoryClassName();
-            constructorBuilder.addStatement("factories[$L] = new $T()", i, ClassName.get(factoryClassName));
+            constructorBuilder.addStatement("factories[$L] = new $T()", i, ClassName.bestGuess(factoryClassName));
 
             constructorBuilder.addStatement("factoriesByType.put($T.class, factories[$L])",
-                    ClassName.get(comp.getClassName()), i);
+                    ClassName.bestGuess(comp.getClassName()), i);
             constructorBuilder.addStatement("factoriesByName.put($S, factories[$L])", comp.getComponentName(), i);
 
             // Register interfaces
             for (String iface : comp.getImplementedInterfaces()) {
                 constructorBuilder.addStatement("factoriesByType.put($T.class, factories[$L])",
-                        ClassName.get(iface), i);
+                        ClassName.bestGuess(iface), i);
             }
 
             // Register in supertype map
             constructorBuilder.addStatement("factoriesBySupertype.computeIfAbsent($T.class, k -> new $T<>()).add(factories[$L])",
-                    ClassName.get(comp.getClassName()), ArrayList.class, i);
+                    ClassName.bestGuess(comp.getClassName()), ArrayList.class, i);
             for (String iface : comp.getImplementedInterfaces()) {
                 constructorBuilder.addStatement("factoriesBySupertype.computeIfAbsent($T.class, k -> new $T<>()).add(factories[$L])",
-                        ClassName.get(iface), ArrayList.class, i);
+                        ClassName.bestGuess(iface), ArrayList.class, i);
             }
         }
 

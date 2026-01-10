@@ -29,9 +29,6 @@ import io.github.yasmramos.veld.aop.InvocationContext;
 import io.github.yasmramos.veld.aop.JoinPoint;
 import io.github.yasmramos.veld.aop.MethodInvocation;
 import io.github.yasmramos.veld.aop.interceptor.LoggingInterceptor;
-import io.github.yasmramos.veld.aop.interceptor.TimingInterceptor;
-import io.github.yasmramos.veld.aop.interceptor.TransactionInterceptor;
-import io.github.yasmramos.veld.aop.interceptor.ValidationInterceptor;
 import io.github.yasmramos.veld.runtime.async.AsyncExecutor;
 import io.github.yasmramos.veld.runtime.async.SchedulerService;
 
@@ -231,9 +228,9 @@ public class AopClassGenerator {
     private void generateInterceptorFields(TypeSpec.Builder classBuilder, Set<String> interceptorTypes) {
         for (String interceptorType : interceptorTypes) {
             String fieldName = getInterceptorFieldName(interceptorType);
-            FieldSpec field = FieldSpec.builder(ClassName.get(interceptorType), fieldName)
+            FieldSpec field = FieldSpec.builder(ClassName.bestGuess(interceptorType), fieldName)
                     .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
-                    .initializer("new $T()", ClassName.get(interceptorType))
+                    .initializer("new $T()", ClassName.bestGuess(interceptorType))
                     .build();
             classBuilder.addField(field);
         }
@@ -595,7 +592,7 @@ public class AopClassGenerator {
 
         for (int i = 0; i < parameters.size(); i++) {
             VariableElement param = parameters.get(i);
-            params.add(ParameterSpec.builder(ClassName.get(param.asType()), param.getSimpleName().toString()).build());
+            params.add(ParameterSpec.builder(TypeName.get(param.asType()), param.getSimpleName().toString()).build());
             args.add(param.getSimpleName().toString());
         }
 
@@ -603,13 +600,13 @@ public class AopClassGenerator {
         List<? extends TypeMirror> thrownTypes = method.getThrownTypes();
         List<ClassName> thrownExceptions = new ArrayList<>();
         for (TypeMirror thrownType : thrownTypes) {
-            thrownExceptions.add(ClassName.get(thrownType));
+            thrownExceptions.add(ClassName.bestGuess(thrownType.toString()));
         }
 
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addParameters(params)
                 .addAnnotation(Override.class)
-                .returns(ClassName.get(returnType));
+                .returns(TypeName.get(returnType));
 
         if (!thrownExceptions.isEmpty()) {
             for (ClassName thrownException : thrownExceptions) {
@@ -667,7 +664,7 @@ public class AopClassGenerator {
 
         for (int i = 0; i < parameters.size(); i++) {
             VariableElement param = parameters.get(i);
-            params.add(ParameterSpec.builder(ClassName.get(param.asType()), param.getSimpleName().toString()).build());
+            params.add(ParameterSpec.builder(TypeName.get(param.asType()), param.getSimpleName().toString()).build());
             args.add(param.getSimpleName().toString());
         }
 
@@ -675,15 +672,15 @@ public class AopClassGenerator {
         List<? extends TypeMirror> thrownTypes = method.getThrownTypes();
         List<ClassName> thrownExceptions = new ArrayList<>();
         for (TypeMirror thrownType : thrownTypes) {
-            thrownExceptions.add(ClassName.get(thrownType));
+            thrownExceptions.add(ClassName.bestGuess(thrownType.toString()));
         }
 
-        ClassName rateLimiterServiceClass = ClassName.get("io.github.yasmramos.veld.runtime.ratelimit", "RateLimiterService");
+        ClassName rateLimiterServiceClass = ClassName.bestGuess("io.github.yasmramos.veld.runtime.ratelimit.RateLimiterService");
 
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addParameters(params)
                 .addAnnotation(Override.class)
-                .returns(ClassName.get(returnType));
+                .returns(TypeName.get(returnType));
 
         if (!thrownExceptions.isEmpty()) {
             for (ClassName thrownException : thrownExceptions) {
@@ -691,7 +688,7 @@ public class AopClassGenerator {
             }
         }
 
-        ClassName rateLimitExceptionClass = ClassName.get("io.github.yasmramos.veld.runtime.ratelimit", "RateLimiterService", "RateLimitExceededException");
+        ClassName rateLimitExceptionClass = ClassName.get("io.github.yasmramos.veld.runtime.ratelimit", "RateLimiterService$RateLimitExceededException");
 
         if (blocking.equals("true")) {
             methodBuilder
@@ -731,7 +728,7 @@ public class AopClassGenerator {
 
         for (int i = 0; i < parameters.size(); i++) {
             VariableElement param = parameters.get(i);
-            params.add(ParameterSpec.builder(ClassName.get(param.asType()), param.getSimpleName().toString()).build());
+            params.add(ParameterSpec.builder(TypeName.get(param.asType()), param.getSimpleName().toString()).build());
             args.add(param.getSimpleName().toString());
         }
 
@@ -739,13 +736,13 @@ public class AopClassGenerator {
         List<? extends TypeMirror> thrownTypes = method.getThrownTypes();
         List<ClassName> thrownExceptions = new ArrayList<>();
         for (TypeMirror thrownType : thrownTypes) {
-            thrownExceptions.add(ClassName.get(thrownType));
+            thrownExceptions.add(ClassName.bestGuess(thrownType.toString()));
         }
 
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addParameters(params)
                 .addAnnotation(Override.class)
-                .returns(ClassName.get(returnType));
+                .returns(TypeName.get(returnType));
 
         if (!thrownExceptions.isEmpty()) {
             for (ClassName thrownException : thrownExceptions) {
@@ -770,7 +767,7 @@ public class AopClassGenerator {
         if (isVoid) {
             methodBuilder.addStatement("super.$N($L)", methodName, String.join(", ", args));
         } else {
-            methodBuilder.addStatement("$T $N = super.$N($L)", ClassName.get(returnType), resultVar, methodName, String.join(", ", args));
+            methodBuilder.addStatement("$T $N = super.$N($L)", TypeName.get(returnType), resultVar, methodName, String.join(", ", args));
         }
 
         // After returning advice

@@ -14,7 +14,7 @@ import io.github.yasmramos.veld.Veld;
 import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.ComponentFactory;
 
-import javax.annotation.processing.SuppressWarnings;
+import java.lang.SuppressWarnings;
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -46,7 +46,7 @@ public final class ComponentFactorySourceGenerator {
         String packageName = component.getPackageName();
         String factoryPackageName = packageName.isEmpty() ? "veld" : packageName + ".veld";
         String factoryClassName = component.getFactoryClassName();
-        TypeName componentType = ClassName.get(component.getClassName());
+        TypeName componentType = ClassName.bestGuess(component.getClassName());
 
         // Build class declaration with Javadoc
         TypeSpec.Builder classBuilder = TypeSpec.classBuilder(getSimpleName(factoryClassName))
@@ -54,7 +54,7 @@ public final class ComponentFactorySourceGenerator {
                         ClassName.get(ComponentFactory.class),
                         TypeVariableName.get(component.getClassName())))
                 .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                .addJavadoc("Generated factory for $T.\n", ClassName.get(component.getClassName()))
+                .addJavadoc("Generated factory for $T.\n", ClassName.bestGuess(component.getClassName()))
                 .addAnnotation(createSuppressWarningsAnnotation());
 
         // Add constructor
@@ -202,7 +202,7 @@ public final class ComponentFactorySourceGenerator {
      * Handles Provider<T> and Optional<T> types correctly.
      */
     private String generateDependencyGetExpression(InjectionPoint.Dependency dep) {
-        TypeName depType = ClassName.get(dep.getTypeName());
+        TypeName depType = ClassName.bestGuess(dep.getTypeName());
         if (dep.isProvider()) {
             // Provider<T> injection - use Veld.getProvider()
             return "$T.getProvider(" + dep.getActualTypeName() + ".class)";
