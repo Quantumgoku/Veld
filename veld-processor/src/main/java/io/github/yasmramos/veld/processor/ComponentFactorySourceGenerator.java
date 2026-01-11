@@ -199,23 +199,21 @@ public final class ComponentFactorySourceGenerator {
 
     /**
      * Generates the appropriate expression for a dependency.
-     * Since factories are created by the registry with dependencies passed in,
-     * we generate a simple placeholder that will be replaced by actual factory calls.
+     * Uses Veld.getRegistry() to get the factory and create the dependency.
      */
     private String generateDependencyGetExpression(InjectionPoint.Dependency dep) {
-        // Get the type name for the dependency
-        String typeName = dep.getTypeName();
-        
-        if (dep.isProvider()) {
-            // Provider<T> injection - should be handled specially
-            return "null /* Provider injection not yet implemented */";
-        } else if (dep.isOptionalWrapper()) {
-            // Optional<T> injection
-            return "null /* Optional injection not yet implemented */";
+        if (dep.isOptionalWrapper()) {
+            // Optional<T> injection - check if factory exists, return Optional.of() or Optional.empty()
+            String actualType = dep.getActualTypeName();
+            return "io.github.yasmramos.veld.Veld.getRegistry().getFactory(" + actualType + ".class) != null ? " +
+                   "java.util.Optional.of((" + actualType + ") io.github.yasmramos.veld.Veld.getRegistry().getFactory(" + actualType + ".class).create()) : " +
+                   "java.util.Optional.empty()";
+        } else if (dep.isProvider()) {
+            // Provider<T> injection - return a Provider that gets from registry
+            return "() -> (" + dep.getActualTypeName() + ") io.github.yasmramos.veld.Veld.getRegistry().getFactory(" + dep.getActualTypeName() + ".class).create()";
         } else {
-            // Regular injection - generate a casted factory call
-            // This will be replaced with actual factory invocation
-            return "null /* TODO: Implement dependency resolution */";
+            // Regular injection - get singleton from registry
+            return "(" + dep.getActualTypeName() + ") io.github.yasmramos.veld.Veld.getRegistry().getSingleton(" + dep.getActualTypeName() + ".class)";
         }
     }
 

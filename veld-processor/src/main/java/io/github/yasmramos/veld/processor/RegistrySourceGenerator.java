@@ -88,6 +88,7 @@ public final class RegistrySourceGenerator {
         addGetFactoryByType(classBuilder);
         addGetFactoryByName(classBuilder);
         addGetFactoriesForType(classBuilder);
+        addGetSingleton(classBuilder);
 
         // Build JavaFile
         JavaFile.Builder javaFileBuilder = JavaFile.builder("io.github.yasmramos.veld", classBuilder.build());
@@ -174,6 +175,16 @@ public final class RegistrySourceGenerator {
                 .initializer("new $T<>()", HashMap.class)
                 .build();
         classBuilder.addField(factoriesBySupertypeField);
+
+        // Singleton cache - stores instantiated singletons
+        FieldSpec singletonCacheField = FieldSpec.builder(ParameterizedTypeName.get(
+                ClassName.get(IdentityHashMap.class),
+                ClassName.get(Class.class),
+                ClassName.get(Object.class)), "singletonCache")
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                .initializer("new $T<>()", IdentityHashMap.class)
+                .build();
+        classBuilder.addField(singletonCacheField);
     }
 
     private void addStaticInitializer(TypeSpec.Builder classBuilder) {
@@ -332,6 +343,42 @@ public final class RegistrySourceGenerator {
                 .addStatement("return ($T<ComponentFactory<? extends T>>) new $T<>(list)", List.class, ArrayList.class)
                 .build();
         classBuilder.addMethod(getFactoriesForType);
+    }
+
+    private void addGetSingleton(TypeSpec.Builder classBuilder) {
+        MethodSpec.Builder getSingletonBuilder = MethodSpec.methodBuilder("getSingleton")
+                .addAnnotation(Override.class)
+                .addAnnotation(AnnotationSpec.builder(SuppressWarnings.class)
+                        .addMember("value", "$S", "unchecked")
+                        .build())
+                .addTypeVariable(TypeVariableName.get("T"))
+                .addModifiers(Modifier.PUBLIC)
+                .returns(TypeVariableName.get("T"))
+                .addParameter(ParameterizedTypeName.get(ClassName.get(Class.class), TypeVariableName.get("T")), "type");
+
+        // Get factory first
+        getSingletonBuilder.addStatement("$T<?> factory = ($T<?>) factoriesByType.get(type)", ComponentFactory.class, ComponentFactory.class)
+                .beginControlFlow("if (factory == null)")
+                .addStatement("return null")
+                .endControlFlow();
+
+        // Check if singleton or prototype
+        getSingletonBuilder.beginControlFlow("if (factory.getScope() == $T.SINGLETON)", ScopeType.class)
+                .beginControlFlow("synchronized (singletonCache)")
+                .addStatement("$T cached = ($T) singletonCache.get(type)", Object.class, Object.class)
+                .beginControlFlow("if (cached != null)")
+                .addStatement("return ($T) cached", TypeVariableName.get("T"))
+                .endControlFlow()
+                .addStatement("$T newInstance = ($T) factory.create()", Object.class, Object.class)
+                .addStatement("singletonCache.put(type, newInstance)")
+                .addStatement("return ($T) newInstance", TypeVariableName.get("T"))
+                .endControlFlow()
+                .endControlFlow()
+                .beginControlFlow("else")
+                .addStatement("return ($T) factory.create()", TypeVariableName.get("T"))
+                .endControlFlow();
+
+        classBuilder.addMethod(getSingletonBuilder.build());
     }
 
     private AnnotationSpec createSuppressWarningsAnnotation() {
