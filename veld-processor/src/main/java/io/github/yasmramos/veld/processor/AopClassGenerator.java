@@ -412,7 +412,13 @@ public class AopClassGenerator {
             String zone = getAnnotationValue(method, "io.github.yasmramos.veld.annotation.Scheduled", "zone", "");
 
             // Generate Runnable
-            methodBuilder.addStatement("$T task_$N = () -> {\n            try {\n                this.$N();\n            } catch ($T e) {\n                $T.err.println(\"[Veld] Scheduled task failed: $N - \" + e.getMessage());\n            }\n        }",
+            methodBuilder.addStatement("$T task_$N = () -> {\n" +
+                    "try {\n" +
+                    "this.$N();\n" +
+                    "} catch ($T e) {\n" +
+                    "$T.err.println(\"[Veld] Scheduled task failed: $N - \" + e.getMessage());\n" +
+                    "}\n" +
+                    "}",
                     Runnable.class, methodName, methodName, Exception.class, System.class, methodName);
 
             if (!cron.isEmpty()) {
@@ -550,17 +556,35 @@ public class AopClassGenerator {
 
         if (isVoid) {
             // Fire and forget with optimized executor
-            methodBuilder.addStatement("$T.runAsync(() -> {\n            try {\n                super.$N($L);\n            } catch ($T e) {\n                $T.err.println(\"[Veld] Async method failed: $N - \" + e.getMessage());\n            }\n        }, $L)",
+            methodBuilder.addStatement("$T.runAsync(() -> {\n" +
+                    "try {\n" +
+                    "super.$N($L);\n" +
+                    "} catch ($T e) {\n" +
+                    "$T.err.println(\"[Veld] Async method failed: $N - \" + e.getMessage());\n" +
+                    "}\n" +
+                    "}, $L)",
                     CompletableFuture.class, methodName, String.join(", ", args), Exception.class, System.class, methodName, executorAccess);
         } else if (isCompletableFuture) {
             // Return CompletableFuture with optimized executor
-            methodBuilder.addStatement("return $T.supplyAsync(() -> {\n            try {\n                return super.$N($L).join();\n            } catch ($T e) {\n                throw new $T(e);\n            }\n        }, $L)",
+            methodBuilder.addStatement("return $T.supplyAsync(() -> {\n" +
+                    "try {\n" +
+                    "return super.$N($L).join();\n" +
+                    "} catch ($T e) {\n" +
+                    "throw new $T(e);\n" +
+                    "}\n" +
+                    "}, $L)",
                     CompletableFuture.class, methodName, String.join(", ", args), Exception.class, CompletionException.class, executorAccess);
         } else {
             // Other return types - wrap in CompletableFuture and block
             methodBuilder.beginControlFlow("try")
-                    .addStatement("return $T.supplyAsync(() -> {\n                try {\n                    return super.$N($L);\n                } catch ($T e) {\n                    throw new $T(e);\n                }\n            }, $L).get()",
-                    CompletableFuture.class, methodName, String.join(", ", args), Exception.class, CompletionException.class, executorAccess)
+                    .addStatement("return $T.supplyAsync(() -> {\n" +
+                            "try {\n" +
+                            "return super.$N($L);\n" +
+                            "} catch ($T e) {\n" +
+                            "throw new $T(e);\n" +
+                            "}\n" +
+                            "}, $L).get()",
+                            CompletableFuture.class, methodName, String.join(", ", args), Exception.class, CompletionException.class, executorAccess)
                     .endControlFlow()
                     .beginControlFlow("catch ($T e)", Exception.class)
                     .addStatement("throw new $T(e)", RuntimeException.class)

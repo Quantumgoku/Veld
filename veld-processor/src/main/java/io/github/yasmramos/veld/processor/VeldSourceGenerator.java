@@ -158,7 +158,7 @@ public final class VeldSourceGenerator {
                 .addStatement("_activeProfiles = initialProfiles.toArray(new String[0])")
                 .addStatement("_lifecycle = new $T()", LifecycleProcessor.class)
                 .addStatement("_lifecycle.setEventBus(_eventBus)")
-                .addStatement("_conditionalRegistry = new $_(_registry, initialProfiles)", ConditionalRegistry.class)
+                .addStatement("_conditionalRegistry = new $T(_registry, initialProfiles)", ConditionalRegistry.class)
                 .build();
 
         classBuilder.addStaticBlock(staticInitCode);
@@ -168,7 +168,7 @@ public final class VeldSourceGenerator {
         MethodSpec computeProfiles = MethodSpec.methodBuilder("computeActiveProfiles")
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                 .returns(ParameterizedTypeName.get(ClassName.get(Set.class), ClassName.get(String.class)))
-                .addStatement("$T profiles = $T.getProperty(\"veld.profiles.active\", \n            $T.getenv().getOrDefault(\"VELD_PROFILES_ACTIVE\", \"\"))",
+                .addStatement("$T profiles = $T.getProperty(\"veld.profiles.active\",\n$T.getenv().getOrDefault(\"VELD_PROFILES_ACTIVE\", \"\"))",
                         String.class, System.class, System.class)
                 .beginControlFlow("if (profiles.isEmpty())")
                 .addStatement("return $T.of()", Set.class)
@@ -498,8 +498,10 @@ public final class VeldSourceGenerator {
         MethodSpec sortByOrder = MethodSpec.methodBuilder("sortByOrder")
                 .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
                 .returns(ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(ComponentFactory.class)))
-                .addParameter(ParameterSpec.builder(ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(ComponentFactory.class)), "factories").build())
-                .addStatement("return factories.stream()\n            .sorted($T.comparingInt($T::getOrder))\n            .collect($T.toList())",
+                .addParameter(ParameterizedTypeName.get(ClassName.get(List.class), ClassName.get(ComponentFactory.class)), "factories")
+                .addStatement("return factories.stream()\n" +
+                        ".sorted($T.comparingInt($T::getOrder))\n" +
+                        ".collect($T.toList())",
                         Comparator.class, ComponentFactory.class, Collectors.class)
                 .build();
         classBuilder.addMethod(sortByOrder);
@@ -513,7 +515,12 @@ public final class VeldSourceGenerator {
     }
 
     private String getHolderClassName(ComponentInfo comp) {
-        return "Holder_" + getSimpleName(comp);
+        // Use package name hash + simple name to avoid collisions when different packages have classes with the same simple name
+        String packageName = comp.getPackageName();
+        String simpleName = getSimpleName(comp);
+        // Use a hash of the package name to avoid long names with special characters
+        int packageHash = packageName.hashCode();
+        return "Holder_" + Math.abs(packageHash) + "_" + simpleName;
     }
 
     private String getGetterMethodName(ComponentInfo comp) {

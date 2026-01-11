@@ -71,8 +71,8 @@ public final class ComponentFactorySourceGenerator {
         MethodSpec getComponentTypeMethod = MethodSpec.methodBuilder("getComponentType")
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
-                .returns(ParameterizedTypeName.get(ClassName.get(Class.class), TypeVariableName.get(component.getClassName())))
-                .addStatement("return $T.class", component.getClassName())
+                .returns(ParameterizedTypeName.get(ClassName.get(Class.class), ClassName.bestGuess(component.getClassName())))
+                .addStatement("return $T.class", ClassName.bestGuess(component.getClassName()))
                 .build();
         classBuilder.addMethod(getComponentTypeMethod);
 
