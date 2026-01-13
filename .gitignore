@@ -895,8 +895,11 @@
 # uploads/
 # downloads/
 
-# Shell output save directory
-shell_output_save/
+# Project files and directories
+workspace.json
+tmp/
+pyproject.toml
+browser/
 
 # Claude Agent SDK debug files
 **/.claude/debug/
