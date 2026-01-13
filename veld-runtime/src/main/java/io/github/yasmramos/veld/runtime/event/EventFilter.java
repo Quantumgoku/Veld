@@ -143,12 +143,38 @@ public class EventFilter {
             }
         }
 
-        System.err.println("[EventFilter] No property accessor found for: " + propertyName);
-        return null;
+        // Fallback: Use reflection to get property value
+        return getPropertyValueReflection(event, propertyName);
+    }
+
+    /**
+     * Fallback method to get property value using reflection.
+     * This enables the EventFilter to work with regular events that don't
+     * have pre-registered property accessors.
+     */
+    private static Object getPropertyValueReflection(Event event, String propertyName) {
+        Class<?> clazz = event.getClass();
+        String methodName = "is" + capitalize(propertyName);
+
+        try {
+            // Try boolean "is" getter first
+            try {
+                java.lang.reflect.Method method = clazz.getMethod(methodName);
+                return method.invoke(event);
+            } catch (NoSuchMethodException e) {
+                // Try regular "get" getter
+                methodName = "get" + capitalize(propertyName);
+                java.lang.reflect.Method method = clazz.getMethod(methodName);
+                return method.invoke(event);
+            }
+        } catch (Exception e) {
+            System.err.println("[EventFilter] No property accessor found for: " + propertyName);
+            return null;
+        }
     }
 
     private static final Pattern EXPRESSION_PATTERN = Pattern.compile(
-            "event\\.([a-zA-Z][a-zA-Z0-9]*)\\s*(==|!=|>=|<=|>|<)\\s*(.+)"
+            "(?:event\\.)?([a-zA-Z][a-zA-Z0-9]*)\\s*(==|!=|>=|<=|>|<)\\s*(.+)"
     );
 
     /**
