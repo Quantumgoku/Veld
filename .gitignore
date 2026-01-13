@@ -895,13 +895,6 @@
 # uploads/
 # downloads/
 
-# Development tools and build environments
-tools/
-openjdk-*/
-graalvm-*/
-apache-maven-*/
-shell_output_save/
-
 # Claude Agent SDK debug files
 **/.claude/debug/
 **/.claude/debug/**
