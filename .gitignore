@@ -828,6 +828,7 @@
 **/public/storage
 **/storage/*.key
 **/bootstrap/cache/
+**/shell_output_save/
 
 # ==============================================================================
 # PACKAGE MANAGERS
@@ -894,12 +895,6 @@
 # data/
 # uploads/
 # downloads/
-
-# Project files and directories
-workspace.json
-tmp/
-pyproject.toml
-browser/
 
 # Claude Agent SDK debug files
 **/.claude/debug/
