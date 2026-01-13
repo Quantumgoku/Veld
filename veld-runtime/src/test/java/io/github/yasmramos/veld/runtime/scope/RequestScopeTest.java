@@ -396,6 +396,16 @@ class RequestScopeTest {
             public ScopeType getScope() {
                 return ScopeType.REQUEST;
             }
+            
+            @Override
+            public void invokePostConstruct(T instance) {
+                // No-op for testing
+            }
+            
+            @Override
+            public void invokePreDestroy(T instance) {
+                // No-op for testing
+            }
         };
     }
 }

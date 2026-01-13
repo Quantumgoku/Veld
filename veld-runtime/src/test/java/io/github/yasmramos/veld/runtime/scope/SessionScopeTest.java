@@ -543,6 +543,16 @@ class SessionScopeTest {
             public ScopeType getScope() {
                 return ScopeType.SESSION;
             }
+            
+            @Override
+            public void invokePostConstruct(T instance) {
+                // No-op for testing
+            }
+            
+            @Override
+            public void invokePreDestroy(T instance) {
+                // No-op for testing
+            }
         };
     }
 }
