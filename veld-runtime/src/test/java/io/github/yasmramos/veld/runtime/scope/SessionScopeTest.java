@@ -27,7 +27,7 @@ class SessionScopeTest {
         // Destroy all previous state to ensure clean test environment
         sessionScope.destroy();
     }
-    
+
     @AfterEach
     void tearDown() {
         // Clean up all session state
@@ -435,13 +435,13 @@ class SessionScopeTest {
         @DisplayName("Should return accurate description when active")
         void shouldReturnAccurateDescriptionWhenActive() {
             SessionScope.setCurrentSession("test-session-12345678");
-            
+
             sessionScope.get("bean1", createFactory("1", null));
-            
+
             String description = sessionScope.describe();
-            
+
             assertTrue(description.contains("SessionScope"));
-            assertTrue(description.contains("session=test-..."));
+            assertTrue(description.contains("session=test-session-..."));
             assertTrue(description.contains("beans=1"));
         }
         
@@ -512,14 +512,24 @@ class SessionScopeTest {
      * Helper method to create a ComponentFactory for testing.
      */
     private <T> ComponentFactory<T> createFactory(T instance, AtomicInteger callCount) {
+        return createFactory(instance, callCount, false);
+    }
+
+    private <T> ComponentFactory<T> createFactory(T instance, AtomicInteger callCount, boolean createNewEachTime) {
         return new ComponentFactory<T>() {
             private final T value = instance;
             private final AtomicInteger count = callCount;
-            
+
             @Override
             public T create() {
                 if (count != null) {
                     count.incrementAndGet();
+                }
+                if (createNewEachTime && value instanceof String) {
+                    // Create a new instance each time with new object
+                    @SuppressWarnings("unchecked")
+                    T newInstance = (T) new String(value.toString());
+                    return newInstance;
                 }
                 return value;
             }

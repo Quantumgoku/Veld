@@ -1,11 +1,11 @@
 package io.github.yasmramos.veld.runtime.scope;
 
-import io.github.yasmramos.veld.VeldException;
-
 import java.util.Map;
 import java.util.ServiceLoader;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Supplier;
+
+import io.github.yasmramos.veld.VeldException;
 
 /**
  * Registry for managing scope instances.
@@ -174,7 +174,7 @@ public final class ScopeRegistry {
     
     /**
      * Registers a custom scope with default display name and description.
-     * 
+     *
      * @param id the unique scope identifier
      * @param factory supplier that creates the scope instance
      */
@@ -201,30 +201,36 @@ public final class ScopeRegistry {
     
     /**
      * Gets or creates a scope by its ID.
-     * 
+     *
      * @param id the scope identifier
      * @return the scope instance
      * @throws NoSuchScopeException if no scope is registered with the given ID
      */
     public static Scope get(String id) {
         initialize();
-        
-        // Check if already instantiated
-        Scope scope = SCOPES.get(id);
-        if (scope != null) {
-            return scope;
+
+        // Check if already instantiated (except for prototype scope which is always recreated)
+        if (!PrototypeScope.SCOPE_ID.equals(id)) {
+            Scope scope = SCOPES.get(id);
+            if (scope != null) {
+                return scope;
+            }
         }
-        
+
         // Get factory and create instance
         Supplier<Scope> factory = SCOPE_FACTORIES.get(id);
         if (factory == null) {
-            throw new NoSuchScopeException("No scope registered with ID: " + id + 
+            throw new NoSuchScopeException("No scope registered with ID: " + id +
                 ". Available scopes: " + getRegisteredScopeIds());
         }
-        
-        // Create and cache the instance
-        scope = factory.get();
-        SCOPES.put(id, scope);
+
+        // Create the scope instance
+        Scope scope = factory.get();
+
+        // Cache non-prototype scopes
+        if (!PrototypeScope.SCOPE_ID.equals(id)) {
+            SCOPES.put(id, scope);
+        }
         return scope;
     }
     
@@ -245,12 +251,20 @@ public final class ScopeRegistry {
     
     /**
      * Checks if a scope is registered.
-     * 
+     *
+     * <p>This method does NOT trigger initialization. It only checks if the scope
+     * is already registered in either the instantiated scopes map or the factories map.
+     * Use this method to check the current state without triggering lazy initialization.</p>
+     *
+     * <p>Note: Built-in scopes (singleton, prototype, request, session) are only available
+     * after initialization has occurred (typically on first call to {@link #get(String)}).</p>
+     *
      * @param id the scope identifier
-     * @return true if the scope is registered
+     * @return true if the scope is registered, false otherwise
      */
     public static boolean contains(String id) {
-        initialize();
+        // Check both instantiated scopes and registered factories
+        // Does not trigger initialization to allow destroy() to work correctly
         return SCOPES.containsKey(id) || SCOPE_FACTORIES.containsKey(id);
     }
     
@@ -315,12 +329,13 @@ public final class ScopeRegistry {
                 System.err.println("Error destroying scope '" + scope.getId() + "': " + e.getMessage());
             }
         }
-        
+
         // Clear all maps
         SCOPES.clear();
         SCOPE_FACTORIES.clear();
         SCOPE_METADATA.clear();
-        
+
+        // Reset initialization flag to allow re-initialization
         initialized = false;
     }
     
@@ -329,8 +344,28 @@ public final class ScopeRegistry {
      * NOT FOR PRODUCTION USE.
      */
     static void reset() {
-        destroy();
+        // Destroy all instantiated scopes
+        for (Scope scope : SCOPES.values()) {
+            try {
+                scope.destroy();
+            } catch (Exception e) {
+                // Ignore errors during reset
+            }
+        }
+
+        // Clear all maps completely
+        SCOPES.clear();
+        SCOPE_FACTORIES.clear();
+        SCOPE_METADATA.clear();
+
+        // Reset initialization flag
+        initialized = false;
+
+        // Reset default scope
         defaultScopeId = SingletonScope.SCOPE_ID;
+
+        // Re-initialize to re-register built-in scopes
+        initialize();
     }
     
     /**

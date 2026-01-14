@@ -1,9 +1,8 @@
 package io.github.yasmramos.veld.runtime.scope;
 
-import io.github.yasmramos.veld.runtime.ComponentFactory;
-
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+
+import io.github.yasmramos.veld.runtime.ComponentFactory;
 
 /**
  * Scope implementation for request-scoped beans.
@@ -70,17 +69,18 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see PrototypeScope
  */
 public class RequestScope implements Scope {
-    
+
     public static final String SCOPE_ID = "request";
-    
-    // ThreadLocal storage for request-scoped beans
-    // Each thread (request) gets its own map of beans
-    private static final ThreadLocal<Map<String, Object>> requestBeans = 
-        ThreadLocal.withInitial(ConcurrentHashMap::new);
-    
-    // Map from scope class to scope instance (for singleton scopes that hold request state)
-    private static final Map<Class<?>, Scope> scopeInstances = new ConcurrentHashMap<>();
-    
+
+    // Maximum number of beans per request to prevent memory leaks
+    private static final int MAX_BEANS_PER_REQUEST = 500;
+
+    // Context holder for request-scoped beans (allows cross-thread access)
+    private static final ContextHolder<Map<String, Object>> requestBeans = new ContextHolder<>();
+
+    // Context holder for request active flag
+    private static final ContextHolder<Boolean> requestActive = new ContextHolder<>();
+
     /**
      * Creates a new RequestScope instance.
      */
@@ -101,15 +101,18 @@ public class RequestScope implements Scope {
     @Override
     public <T> T get(String name, ComponentFactory<T> factory) {
         Map<String, Object> beans = requestBeans.get();
-        
-        @SuppressWarnings("unchecked")
-        T instance = (T) beans.get(name);
-        
-        if (instance == null) {
-            instance = factory.create();
-            beans.put(name, instance);
+
+        // Check bean limit to prevent memory leaks
+        if (beans != null && beans.size() >= MAX_BEANS_PER_REQUEST && !beans.containsKey(name)) {
+            throw new IllegalStateException(
+                "Request bean limit exceeded. Maximum " + MAX_BEANS_PER_REQUEST +
+                " beans per request. Current count: " + beans.size());
         }
-        
+
+        // Use computeIfAbsent for thread-safe bean creation
+        @SuppressWarnings("unchecked")
+        T instance = (T) beans.computeIfAbsent(name, k -> factory.create());
+
         return instance;
     }
     
@@ -123,40 +126,46 @@ public class RequestScope implements Scope {
     public void destroy() {
         // Clear all request-scoped beans
         Map<String, Object> beans = requestBeans.get();
-        beans.clear();
-        requestBeans.remove();
+        if (beans != null) {
+            beans.clear();
+        }
+        requestBeans.clear();
+        requestActive.clear();
     }
     
     @Override
     public boolean isActive() {
-        // Scope is active if we're within a request context
-        return requestBeans.get() != null;
+        // Scope is active only if explicitly set via setRequestScope()
+        return Boolean.TRUE.equals(requestActive.get());
     }
     
     @Override
     public String describe() {
-        int beanCount = requestBeans.get().size();
+        Map<String, Object> beans = requestBeans.get();
+        int beanCount = beans != null ? beans.size() : 0;
         return "RequestScope[beans=" + beanCount + ", active=" + isActive() + "]";
     }
     
     /**
      * Sets the request scope map for the current thread.
      * Used by web framework integration code.
-     * 
+     *
      * @param scopeMap the scope map to use
      */
     public static void setRequestScope(Map<String, Object> scopeMap) {
         if (scopeMap != null) {
             requestBeans.set(scopeMap);
+            requestActive.set(true);
         }
     }
-    
+
     /**
      * Clears the request scope for the current thread.
      * Called at the end of request processing.
      */
     public static void clearRequestScope() {
-        requestBeans.remove();
+        requestBeans.clear();
+        requestActive.clear();
     }
     
     /**
@@ -172,10 +181,28 @@ public class RequestScope implements Scope {
     
     /**
      * Checks if the current thread is within a request context.
-     * 
+     *
      * @return true if within a request
      */
     public static boolean isInRequestContext() {
-        return requestBeans.get() != null;
+        return Boolean.TRUE.equals(requestActive.get());
+    }
+
+    /**
+     * Gets the maximum number of beans allowed per request.
+     *
+     * @return maximum bean count
+     */
+    public static int getMaxBeansPerRequest() {
+        return MAX_BEANS_PER_REQUEST;
+    }
+
+    /**
+     * Resets all request scope state.
+     * Used for testing purposes.
+     */
+    static void reset() {
+        requestBeans.clear();
+        requestActive.clear();
     }
 }
