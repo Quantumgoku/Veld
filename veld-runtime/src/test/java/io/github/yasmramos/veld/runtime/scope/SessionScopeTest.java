@@ -24,13 +24,14 @@ class SessionScopeTest {
     @BeforeEach
     void setUp() {
         sessionScope = new SessionScope();
-        // Reset all session state for test isolation
-        SessionScope.reset();
+        // Destroy all previous state to ensure clean test environment
+        sessionScope.destroy();
     }
 
     @AfterEach
     void tearDown() {
-        SessionScope.reset();
+        // Clean up all session state
+        sessionScope.destroy();
     }
     
     @Nested

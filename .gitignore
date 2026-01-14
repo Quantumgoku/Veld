@@ -909,8 +909,7 @@
 **/.git_backup_by_agent
 **/.git_backup_by_agent/
 
-
+browser/
 tmp
-tmpclaude*
 workspace.json
-browser
+pyproject.toml

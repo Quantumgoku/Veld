@@ -23,13 +23,14 @@ class RequestScopeTest {
     @BeforeEach
     void setUp() {
         requestScope = new RequestScope();
-        // Reset all request scope state for test isolation
-        RequestScope.reset();
+        // Destroy all previous state to ensure clean test environment
+        requestScope.destroy();
     }
 
     @AfterEach
     void tearDown() {
-        RequestScope.reset();
+        // Clean up all request state
+        requestScope.destroy();
     }
     
     @Nested
