@@ -74,18 +74,18 @@ import java.util.function.Supplier;
  * @see io.github.yasmramos.veld.annotation.SessionScoped
  */
 public class SessionScope implements Scope {
-    
+
     public static final String SCOPE_ID = "session";
-    
+
     // Map from session ID to session beans
     // Each session gets its own map of beans
     private static final Map<String, Map<String, Object>> SESSION_BEANS = new ConcurrentHashMap<>();
-    
+
     // Map from session ID to scope metadata
     private static final Map<String, SessionMetadata> SESSION_METADATA = new ConcurrentHashMap<>();
-    
-    // Current session ID holder (set by web framework integration)
-    private static final ThreadLocal<String> CURRENT_SESSION_ID = new ThreadLocal<>();
+
+    // Shared context holder for current session (allows cross-thread access)
+    private static final ContextHolder<String> CURRENT_SESSION_ID = new ContextHolder<>();
     
     /**
      * Creates a new SessionScope instance.
@@ -113,20 +113,17 @@ public class SessionScope implements Scope {
                 "Ensure you are within a valid session (e.g., after HttpServletRequest.getSession()). " +
                 "Web framework integration is required to use @SessionScoped beans.");
         }
-        
+
         Map<String, Object> beans = getOrCreateSessionBeans(sessionId);
-        
+
+        // Use computeIfAbsent for thread-safe bean creation
         @SuppressWarnings("unchecked")
-        T instance = (T) beans.get(name);
-        
-        if (instance == null) {
-            instance = factory.create();
-            beans.put(name, instance);
-            
-            // Track session access
+        T instance = (T) beans.computeIfAbsent(name, k -> {
+            // Track session access when creating new bean
             trackSessionAccess(sessionId);
-        }
-        
+            return factory.create();
+        });
+
         return instance;
     }
     
@@ -147,7 +144,7 @@ public class SessionScope implements Scope {
         // Clear all session data
         SESSION_BEANS.clear();
         SESSION_METADATA.clear();
-        CURRENT_SESSION_ID.remove();
+        CURRENT_SESSION_ID.clear();
     }
     
     @Override
@@ -163,7 +160,9 @@ public class SessionScope implements Scope {
         }
         Map<String, Object> beans = SESSION_BEANS.get(sessionId);
         int beanCount = beans != null ? beans.size() : 0;
-        return "SessionScope[session=" + sessionId.substring(0, 8) + "... beans=" + beanCount + "]";
+        // Truncate long session IDs for readability
+        String displayId = sessionId.length() > 13 ? sessionId.substring(0, 13) + "..." : sessionId;
+        return "SessionScope[session=" + displayId + ", beans=" + beanCount + "]";
     }
     
     /**
@@ -179,17 +178,17 @@ public class SessionScope implements Scope {
     
     /**
      * Gets the current session ID from thread-local context.
-     * 
+     *
      * @return the current session ID, or null if not in a session context
      */
     public static String getCurrentSessionId() {
         return CURRENT_SESSION_ID.get();
     }
-    
+
     /**
      * Sets the current session ID for the calling thread.
      * Used by web framework integration code.
-     * 
+     *
      * @param sessionId the session ID to set
      */
     public static void setCurrentSession(String sessionId) {
@@ -197,25 +196,35 @@ public class SessionScope implements Scope {
             CURRENT_SESSION_ID.set(sessionId);
         }
     }
-    
+
     /**
      * Clears the current session context for the calling thread.
      * Called at the end of request processing.
      */
     public static void clearCurrentSession() {
-        CURRENT_SESSION_ID.remove();
+        CURRENT_SESSION_ID.clear();
     }
     
     /**
      * Clears all beans for a specific session.
      * Called when session expires or is invalidated.
-     * 
+     *
      * @param sessionId the session ID to clear
      * @return the removed beans map, or null if session didn't exist
      */
     public static Map<String, Object> clearSession(String sessionId) {
         SESSION_METADATA.remove(sessionId);
         return SESSION_BEANS.remove(sessionId);
+    }
+
+    /**
+     * Resets all session scope state.
+     * Used for testing purposes.
+     */
+    static void reset() {
+        SESSION_BEANS.clear();
+        SESSION_METADATA.clear();
+        CURRENT_SESSION_ID.clear();
     }
     
     /**

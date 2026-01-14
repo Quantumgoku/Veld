@@ -23,13 +23,13 @@ class RequestScopeTest {
     @BeforeEach
     void setUp() {
         requestScope = new RequestScope();
-        // Clear any previous state
-        RequestScope.clearRequestScope();
+        // Reset all request scope state for test isolation
+        RequestScope.reset();
     }
-    
+
     @AfterEach
     void tearDown() {
-        RequestScope.clearRequestScope();
+        RequestScope.reset();
     }
     
     @Nested
@@ -138,15 +138,16 @@ class RequestScopeTest {
         void shouldRemoveBeanFromScope() {
             // Set up request context
             RequestScope.setRequestScope(new ConcurrentHashMap<>());
-            
-            ComponentFactory<String> factory = createFactory("test-bean", null);
-            
+
+            // Use a factory that creates new instances each time
+            ComponentFactory<String> factory = createFactory("test-bean", null, true);
+
             String bean = requestScope.get("testBean", factory);
             assertEquals("test-bean", bean);
-            
+
             Object removed = requestScope.remove("testBean");
             assertEquals("test-bean", removed);
-            
+
             // Verify new instance is created on next access
             String newBean = requestScope.get("testBean", factory);
             assertNotSame(bean, newBean);
@@ -368,14 +369,24 @@ class RequestScopeTest {
      * Helper method to create a ComponentFactory for testing.
      */
     private <T> ComponentFactory<T> createFactory(T instance, AtomicInteger callCount) {
+        return createFactory(instance, callCount, false);
+    }
+
+    private <T> ComponentFactory<T> createFactory(T instance, AtomicInteger callCount, boolean createNewEachTime) {
         return new ComponentFactory<T>() {
             private final T value = instance;
             private final AtomicInteger count = callCount;
-            
+
             @Override
             public T create() {
                 if (count != null) {
                     count.incrementAndGet();
+                }
+                if (createNewEachTime && value instanceof String) {
+                    // Create a new instance each time with suffix
+                    @SuppressWarnings("unchecked")
+                    T newInstance = (T) new String(value.toString());
+                    return newInstance;
                 }
                 return value;
             }
