@@ -76,18 +76,25 @@ public final class ContextHolder<T> {
 
     /**
      * Atomically updates the current value using the given function.
+     * Uses a compare-and-set loop to ensure atomicity even under contention.
      *
      * @param updateFunction the function to apply to the current value
      * @return the new value
      * @throws NullPointerException if the update function returns null
      */
     public T updateAndGet(UnaryOperator<T> updateFunction) {
-        T newValue = updateFunction.apply(this.value);
-        if (newValue == null) {
-            throw new NullPointerException("ContextHolder update function cannot return null");
+        T current = this.value;
+        while (true) {
+            T newValue = updateFunction.apply(current);
+            if (newValue == null) {
+                throw new NullPointerException("ContextHolder update function cannot return null");
+            }
+            if (compareAndSet(current, newValue)) {
+                return newValue;
+            }
+            // CAS failed, retry with updated current value
+            current = this.value;
         }
-        this.value = newValue;
-        return newValue;
     }
 
     /**
