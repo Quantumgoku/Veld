@@ -354,6 +354,25 @@ public class SessionScope implements Scope {
     }
     
     /**
+     * Sets a shared session ID that will be used by all threads.
+     * Useful for testing concurrent access scenarios.
+     * 
+     * @param sessionId the session ID to use, or null to disable sharing
+     */
+    public static void setSharedCurrentSessionId(String sessionId) {
+        if (sessionId != null) {
+            CURRENT_SESSION_ID.set(sessionId);
+        }
+    }
+    
+    /**
+     * Clears the shared session context.
+     */
+    public static void clearSharedCurrentSessionId() {
+        CURRENT_SESSION_ID.clear();
+    }
+    
+    /**
      * Exception thrown when session context is not available.
      */
     public static class NoSessionContextException extends VeldException {

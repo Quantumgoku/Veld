@@ -1,5 +1,6 @@
 package io.github.yasmramos.veld.runtime.scope;
 
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.UnaryOperator;
 
 /**
@@ -8,7 +9,7 @@ import java.util.function.UnaryOperator;
  * needs to be accessed from multiple threads (e.g., thread pools).
  *
  * <p>This class provides atomic operations for thread-safe read-modify-write
- * operations on the held value.</p>
+ * operations on the held value using AtomicReference internally.</p>
  *
  * <h2>Usage:</h2>
  * <pre>{@code
@@ -26,13 +27,13 @@ import java.util.function.UnaryOperator;
  */
 public final class ContextHolder<T> {
 
-    private volatile T value;
+    private final AtomicReference<T> value;
 
     /**
      * Creates a new ContextHolder with a null initial value.
      */
     public ContextHolder() {
-        this.value = null;
+        this.value = new AtomicReference<>(null);
     }
 
     /**
@@ -41,7 +42,7 @@ public final class ContextHolder<T> {
      * @param initialValue the initial value
      */
     public ContextHolder(T initialValue) {
-        this.value = initialValue;
+        this.value = new AtomicReference<>(initialValue);
     }
 
     /**
@@ -50,7 +51,7 @@ public final class ContextHolder<T> {
      * @param value the value to set
      */
     public void set(T value) {
-        this.value = value;
+        this.value.set(value);
     }
 
     /**
@@ -59,7 +60,7 @@ public final class ContextHolder<T> {
      * @return the current value, or null if not set
      */
     public T get() {
-        return value;
+        return value.get();
     }
 
     /**
@@ -69,32 +70,45 @@ public final class ContextHolder<T> {
      * @return the previous value
      */
     public T getAndSet(T newValue) {
-        T oldValue = this.value;
-        this.value = newValue;
-        return oldValue;
+        return value.getAndSet(newValue);
     }
 
     /**
      * Atomically updates the current value using the given function.
+     * Uses AtomicReference's built-in updateAndGet for efficient atomic updates.
      *
      * @param updateFunction the function to apply to the current value
      * @return the new value
      * @throws NullPointerException if the update function returns null
      */
     public T updateAndGet(UnaryOperator<T> updateFunction) {
-        T newValue = updateFunction.apply(this.value);
-        if (newValue == null) {
-            throw new NullPointerException("ContextHolder update function cannot return null");
-        }
-        this.value = newValue;
-        return newValue;
+        T result = value.updateAndGet(current -> {
+            T newValue = updateFunction.apply(current);
+            if (newValue == null) {
+                throw new NullPointerException("ContextHolder update function cannot return null");
+            }
+            return newValue;
+        });
+        return result;
+    }
+
+    /**
+     * Atomically updates the current value using the given function.
+     * Gets the current value first, then applies the update atomically.
+     *
+     * @param updateFunction the function to apply to the current value
+     * @return the new value
+     * @throws NullPointerException if the update function returns null
+     */
+    public T getAndUpdate(UnaryOperator<T> updateFunction) {
+        return value.getAndUpdate(updateFunction);
     }
 
     /**
      * Clears the context value.
      */
     public void clear() {
-        this.value = null;
+        value.set(null);
     }
 
     /**
@@ -103,7 +117,7 @@ public final class ContextHolder<T> {
      * @return true if a value is present
      */
     public boolean hasValue() {
-        return value != null;
+        return value.get() != null;
     }
 
     /**
@@ -113,7 +127,19 @@ public final class ContextHolder<T> {
      * @return the current value or the default
      */
     public T getOrDefault(T defaultValue) {
-        T v = value;
+        T v = value.get();
         return v != null ? v : defaultValue;
+    }
+
+    /**
+     * Atomically sets the value to the given new value if the current value
+     * equals the expected value.
+     *
+     * @param expected the expected current value
+     * @param newValue the new value to set
+     * @return true if successful, false if the current value was not equal to expected
+     */
+    public boolean compareAndSet(T expected, T newValue) {
+        return value.compareAndSet(expected, newValue);
     }
 }
