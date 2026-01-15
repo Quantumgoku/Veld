@@ -127,7 +127,8 @@ public final class ContextHolder<T> {
      * @return the current value or the default
      */
     public T getOrDefault(T defaultValue) {
-        return value.getOrDefault(defaultValue);
+        T v = value.get();
+        return v != null ? v : defaultValue;
     }
 
     /**
