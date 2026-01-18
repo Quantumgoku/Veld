@@ -104,8 +104,29 @@ public final class VeldSourceGenerator {
             .initializer("$S", "Lifecycle tracking: PostConstruct invoked during initialization, PreDestroy via shutdown()")
             .build());
         
+        // ===== CONDITION FLAGS =====
+        // Generate boolean flags for bean existence conditions
+        addConditionFlagFields(classBuilder, sortedNodes);
+        
+        // ===== PROPERTY LOADER =====
+        // Generate property loading field if needed
+        boolean hasPropertyConditions = sortedNodes.stream()
+            .anyMatch(node -> node.getConditionInfo() != null && 
+                !node.getConditionInfo().getPropertyConditions().isEmpty());
+        if (hasPropertyConditions) {
+            addPropertyLoaderField(classBuilder);
+        }
+        
         // Accumulate all initialization code in a single static block for cleaner output
         CodeBlock.Builder staticInitBuilder = CodeBlock.builder();
+        
+        // Generate property loading in static block
+        if (hasPropertyConditions) {
+            addPropertyLoadingCode(staticInitBuilder, sortedNodes);
+        }
+        
+        // Generate condition flag initialization (bean existence checks)
+        addConditionFlagInitialization(staticInitBuilder, sortedNodes);
         
         // Generate fields and accumulate initialization code
         for (VeldNode node : sortedNodes) {
@@ -461,7 +482,8 @@ public final class VeldSourceGenerator {
         String actualClassName = node.getActualClassName();
         ClassName type = ClassName.bestGuess(actualClassName);
         String fieldName = node.getVeldName();
-
+        boolean hasConditions = hasRuntimeConditions(node);
+        
         CodeBlock initialization = buildInstantiationCode(node);
 
         // Build field injection code using accessors for non-public fields
@@ -474,37 +496,78 @@ public final class VeldSourceGenerator {
         CodeBlock lifecycleCode = buildPostConstructInvocation(node, fieldName);
 
         // Add the field declaration
-        FieldSpec field = FieldSpec.builder(type, fieldName)
-                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
-                .build();
-
-        classBuilder.addField(field);
+        // If has conditions, field must be nullable (not final)
+        FieldSpec.Builder fieldBuilder = FieldSpec.builder(type, fieldName)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC);
+        
+        if (!hasConditions) {
+            fieldBuilder.addModifier(Modifier.FINAL);
+        } else {
+            fieldBuilder.initializer("null");
+            staticInitBuilder.add("// Conditional bean: $N\n", fieldName);
+        }
+        
+        classBuilder.addField(fieldBuilder.build());
 
         // Accumulate initialization code in the shared static block
         // Comment header for this component
         staticInitBuilder.add("// --- $N ---\n", fieldName);
 
-        // First assign the field
-        staticInitBuilder.addStatement("$N = $L", fieldName, initialization);
+        // If has conditions, wrap initialization in if statement
+        if (hasConditions) {
+            CodeBlock conditionExpr = generateConditionExpression(node);
+            staticInitBuilder.add("if ($L) {\n", conditionExpr);
+            staticInitBuilder.indent();
+            
+            // First assign the field
+            staticInitBuilder.addStatement("$N = $L", fieldName, initialization);
 
-        // Add field injections using accessor for non-public fields
-        if (!fieldInjectionCode.isEmpty()) {
-            staticInitBuilder.add(fieldInjectionCode);
-        }
+            // Add field injections using accessor for non-public fields
+            if (!fieldInjectionCode.isEmpty()) {
+                staticInitBuilder.add(fieldInjectionCode);
+            }
 
-        // Add method injections
-        if (!methodInjectionCode.isEmpty()) {
-            staticInitBuilder.add(methodInjectionCode);
-        }
+            // Add method injections
+            if (!methodInjectionCode.isEmpty()) {
+                staticInitBuilder.add(methodInjectionCode);
+            }
 
-        // Add PostConstruct call
-        if (node.hasPostConstruct()) {
-            // Use accessor for private lifecycle, direct call for public
-            if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
-                ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
-                staticInitBuilder.addStatement("$T.postConstruct($N)", accessorClass, fieldName);
-            } else {
-                staticInitBuilder.addStatement("$N.$N()", fieldName, node.getPostConstructMethod());
+            // Add PostConstruct call
+            if (node.hasPostConstruct()) {
+                // Use accessor for private lifecycle, direct call for public
+                if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
+                    ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
+                    staticInitBuilder.addStatement("$T.postConstruct($N)", accessorClass, fieldName);
+                } else {
+                    staticInitBuilder.addStatement("$N.$N()", fieldName, node.getPostConstructMethod());
+                }
+            }
+            
+            staticInitBuilder.unindent();
+            staticInitBuilder.add("}\n");
+        } else {
+            // Original logic for unconditional beans
+            staticInitBuilder.addStatement("$N = $L", fieldName, initialization);
+
+            // Add field injections using accessor for non-public fields
+            if (!fieldInjectionCode.isEmpty()) {
+                staticInitBuilder.add(fieldInjectionCode);
+            }
+
+            // Add method injections
+            if (!methodInjectionCode.isEmpty()) {
+                staticInitBuilder.add(methodInjectionCode);
+            }
+
+            // Add PostConstruct call
+            if (node.hasPostConstruct()) {
+                // Use accessor for private lifecycle, direct call for public
+                if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
+                    ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
+                    staticInitBuilder.addStatement("$T.postConstruct($N)", accessorClass, fieldName);
+                } else {
+                    staticInitBuilder.addStatement("$N.$N()", fieldName, node.getPostConstructMethod());
+                }
             }
         }
     }
@@ -687,11 +750,18 @@ public final class VeldSourceGenerator {
     private void addSingletonAccessor(TypeSpec.Builder classBuilder, VeldNode node) {
         ClassName returnType = ClassName.bestGuess(node.getActualClassName());
         String methodName = node.getVeldName();
+        boolean hasConditions = hasRuntimeConditions(node);
         
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .returns(returnType)
-                .addStatement("return $N", methodName);
+                .returns(returnType);
+        
+        // If has conditions, add null check at the start of the method
+        if (hasConditions) {
+            methodBuilder.addStatement("if ($N == null) return null", methodName);
+        }
+        
+        methodBuilder.addStatement("return $N", methodName);
         
         StringBuilder javadoc = new StringBuilder("Returns the $N singleton instance.\n");
         if (node.hasPostConstruct()) {
@@ -699,6 +769,9 @@ public final class VeldSourceGenerator {
         }
         if (node.hasPreDestroy()) {
             javadoc.append("<p><b>Lifecycle:</b> @PreDestroy will be invoked on shutdown().</p>\n");
+        }
+        if (hasConditions) {
+            javadoc.append("\n<p><b>Conditional:</b> May return null if condition is not met.</p>\n");
         }
         
         classBuilder.addMethod(methodBuilder.build());
@@ -708,10 +781,17 @@ public final class VeldSourceGenerator {
         ClassName returnType = ClassName.bestGuess(node.getActualClassName());
         String methodName = node.getVeldName();
         String instanceVar = methodName + "Instance";
+        boolean hasConditions = hasRuntimeConditions(node);
 
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .returns(returnType);
+
+        // If has conditions, add condition check at the start
+        if (hasConditions) {
+            CodeBlock conditionExpr = generateConditionExpression(node);
+            methodBuilder.beginControlFlow("if ($L)", conditionExpr);
+        }
 
         // Declare local variable for the instance
         methodBuilder.addStatement("$T $N = $L", returnType, instanceVar, buildInstantiationCode(node));
@@ -741,6 +821,13 @@ public final class VeldSourceGenerator {
 
         // Return the instance
         methodBuilder.addStatement("return $N", instanceVar);
+
+        // Close the if block if has conditions
+        if (hasConditions) {
+            methodBuilder.nextControlFlow("else");
+            methodBuilder.addStatement("return null");
+            methodBuilder.endControlFlow();
+        }
 
         classBuilder.addMethod(methodBuilder.build());
     }
@@ -1033,6 +1120,246 @@ public final class VeldSourceGenerator {
             }
         }
         return errors;
+    }
+    
+    // ===== CONDITION CODE GENERATION =====
+    
+    /**
+     * Generates boolean flag fields for bean existence conditions.
+     * These flags are set during static initialization and used to evaluate conditions.
+     */
+    private void addConditionFlagFields(TypeSpec.Builder classBuilder, List<VeldNode> sortedNodes) {
+        // Collect all bean types/names that are referenced in conditions
+        Set<String> referencedBeans = new LinkedHashSet<>();
+        
+        for (VeldNode node : sortedNodes) {
+            if (node.getConditionInfo() != null) {
+                ConditionInfo info = node.getConditionInfo();
+                
+                // Present bean conditions
+                for (ConditionInfo.PresentBeanConditionInfo beanCond : info.getPresentBeanConditions()) {
+                    for (String type : beanCond.beanTypes()) {
+                        referencedBeans.add(type);
+                    }
+                    for (String name : beanCond.beanNames()) {
+                        referencedBeans.add("bean:" + name);
+                    }
+                }
+                
+                // Missing bean conditions
+                for (ConditionInfo.MissingBeanConditionInfo beanCond : info.getMissingBeanConditions()) {
+                    for (String type : beanCond.beanTypes()) {
+                        referencedBeans.add(type);
+                    }
+                    for (String name : beanCond.beanNames()) {
+                        referencedBeans.add("bean:" + name);
+                    }
+                }
+            }
+        }
+        
+        // Generate flag field for each referenced bean
+        for (String bean : referencedBeans) {
+            String flagName = toValidFieldName(bean);
+            classBuilder.addField(FieldSpec.builder(
+                ClassName.get("boolean"), flagName)
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+                .addJavadoc("Condition flag for bean existence: $L\n", bean)
+                .build());
+        }
+    }
+    
+    /**
+     * Adds a field for property loading if property conditions exist.
+     */
+    private void addPropertyLoaderField(TypeSpec.Builder classBuilder) {
+        classBuilder.addField(FieldSpec.builder(
+            ClassName.get("io.github.yasmramos.veld", "VeldProperties"), "properties")
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC)
+            .addJavadoc("Property loader for @ConditionalOnProperty evaluation\n")
+            .build());
+    }
+    
+    /**
+     * Generates code to load properties in the static initialization block.
+     */
+    private void addPropertyLoadingCode(CodeBlock.Builder staticInitBuilder, List<VeldNode> sortedNodes) {
+        staticInitBuilder.add("// Load properties for @ConditionalOnProperty evaluation\n");
+        staticInitBuilder.add("this.properties = new $T();\n", 
+            ClassName.get("io.github.yasmramos.veld", "VeldProperties"));
+        staticInitBuilder.add("\n");
+    }
+    
+    /**
+     * Generates code to initialize condition flags (bean existence checks).
+     * This must run AFTER all singleton holders are created but BEFORE condition evaluation.
+     */
+    private void addConditionFlagInitialization(CodeBlock.Builder staticInitBuilder, List<VeldNode> sortedNodes) {
+        staticInitBuilder.add("// Initialize condition flags (bean existence checks)\n");
+        
+        // Build a map of className -> veldName for quick lookup
+        Map<String, String> classToVeldName = new LinkedHashMap<>();
+        for (VeldNode node : sortedNodes) {
+            classToVeldName.put(node.getClassName(), node.getVeldName());
+        }
+        
+        // Generate flag initialization for each bean
+        for (VeldNode node : sortedNodes) {
+            if (node.getConditionInfo() != null && node.getConditionInfo().hasBeanConditions()) {
+                String veldName = node.getVeldName();
+                String flagName = toValidFieldName(node.getClassName());
+                
+                staticInitBuilder.add("hasBean_$N = true;\n", flagName);
+            }
+        }
+        
+        staticInitBuilder.add("\n");
+    }
+    
+    /**
+     * Converts a bean type or name to a valid Java field name.
+     */
+    private String toValidFieldName(String bean) {
+        // Handle special prefixes
+        if (bean.startsWith("bean:")) {
+            bean = bean.substring(5);
+        }
+        
+        // Convert fully qualified class name to field name
+        // e.g., "com.example.DataSource" -> "com_example_DataSource"
+        StringBuilder result = new StringBuilder();
+        for (int i = 0; i < bean.length(); i++) {
+            char c = bean.charAt(i);
+            if (Character.isJavaIdentifierPart(c)) {
+                result.append(c == '.' ? '_' : c);
+            }
+        }
+        
+        // Ensure it starts with a letter
+        if (result.length() > 0 && !Character.isJavaLetter(result.charAt(0))) {
+            result.insert(0, "bean_");
+        }
+        
+        return result.toString();
+    }
+    
+    /**
+     * Generates the condition evaluation expression for a node.
+     * Returns CodeBlock that evaluates all conditions.
+     */
+    private CodeBlock generateConditionExpression(VeldNode node) {
+        CodeBlock.Builder builder = CodeBlock.builder();
+        ConditionInfo info = node.getConditionInfo();
+        
+        if (info == null || !info.hasConditions()) {
+            builder.add("true");
+            return builder.build();
+        }
+        
+        List<CodeBlock> conditions = new ArrayList<>();
+        
+        // Property conditions
+        for (ConditionInfo.PropertyConditionInfo propCond : info.getPropertyConditions()) {
+            String propName = propCond.name();
+            String havingValue = propCond.havingValue();
+            boolean matchIfMissing = propCond.matchIfMissing();
+            
+            if (havingValue.isEmpty()) {
+                // Just check if property exists
+                conditions.add(CodeBlock.of("properties.hasProperty($S)", propName));
+            } else {
+                // Check if property has specific value
+                conditions.add(CodeBlock.of("properties.getProperty($S, $S)", propName, havingValue));
+            }
+        }
+        
+        // Class conditions - always true in compile-time model (class is in classpath)
+        for (ConditionInfo.ClassConditionInfo classCond : info.getClassConditions()) {
+            for (String className : classCond.classNames()) {
+                // In static model, if class is referenced, it must be available
+                conditions.add(CodeBlock.of("true // @ConditionalOnClass: $S", className));
+            }
+        }
+        
+        // Present bean conditions
+        for (ConditionInfo.PresentBeanConditionInfo beanCond : info.getPresentBeanConditions()) {
+            List<CodeBlock> beanChecks = new ArrayList<>();
+            
+            for (String type : beanCond.beanTypes()) {
+                String flagName = toValidFieldName(type);
+                beanChecks.add(CodeBlock.of("hasBean_$N", flagName));
+            }
+            
+            for (String name : beanCond.beanNames()) {
+                String flagName = toValidFieldName("bean:" + name);
+                beanChecks.add(CodeBlock.of("hasBean_$N", flagName));
+            }
+            
+            if (!beanChecks.isEmpty()) {
+                if (beanCond.matchAll()) {
+                    // AND logic - all must be present
+                    CodeBlock andBlock = beanChecks.stream()
+                        .reduce((a, b) -> CodeBlock.of("$N && $N", a, b))
+                        .orElse(CodeBlock.of("true"));
+                    conditions.add(andBlock);
+                } else {
+                    // OR logic - any can be present
+                    CodeBlock orBlock = beanChecks.stream()
+                        .reduce((a, b) -> CodeBlock.of("$N || $N", a, b))
+                        .orElse(CodeBlock.of("true"));
+                    conditions.add(orBlock);
+                }
+            }
+        }
+        
+        // Missing bean conditions
+        for (ConditionInfo.MissingBeanConditionInfo beanCond : info.getMissingBeanConditions()) {
+            List<CodeBlock> beanChecks = new ArrayList<>();
+            
+            for (String type : beanCond.beanTypes()) {
+                String flagName = toValidFieldName(type);
+                beanChecks.add(CodeBlock.of("!hasBean_$N", flagName));
+            }
+            
+            for (String name : beanCond.beanNames()) {
+                String flagName = toValidFieldName("bean:" + name);
+                beanChecks.add(CodeBlock.of("!hasBean_$N", flagName));
+            }
+            
+            if (!beanChecks.isEmpty()) {
+                // All must be missing (AND logic)
+                CodeBlock andBlock = beanChecks.stream()
+                    .reduce((a, b) -> CodeBlock.of("$N && $N", a, b))
+                    .orElse(CodeBlock.of("true"));
+                conditions.add(andBlock);
+            }
+        }
+        
+        // Combine all conditions with AND
+        if (conditions.isEmpty()) {
+            builder.add("true");
+        } else {
+            CodeBlock combined = conditions.stream()
+                .reduce((a, b) -> CodeBlock.of("$N && $N", a, b))
+                .orElse(CodeBlock.of("true"));
+            builder.add(combined);
+        }
+        
+        return builder.build();
+    }
+    
+    /**
+     * Checks if a node has any runtime-evaluable conditions.
+     */
+    private boolean hasRuntimeConditions(VeldNode node) {
+        if (node.getConditionInfo() == null) {
+            return false;
+        }
+        
+        ConditionInfo info = node.getConditionInfo();
+        return !info.getPropertyConditions().isEmpty() ||
+               !info.getPresentBeanConditions().isEmpty() ||
+               !info.getMissingBeanConditions().isEmpty();
     }
     
     private void note(String message) {
