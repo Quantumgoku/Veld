@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.processor;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,7 +19,7 @@ public final class BeanMetadata {
     private String factoryClassName;
     private String factoryMethodName;
     private String factoryMethodDescriptor;
-    private ScopeType scope;
+    private String scope;  // "singleton", "prototype", or custom scope ID
     private String qualifier;
     private boolean isPrimary;
     private final List<String> dependencies = new ArrayList<>();
@@ -42,7 +41,7 @@ public final class BeanMetadata {
         return this;
     }
 
-    public BeanMetadata withScope(ScopeType scope) {
+    public BeanMetadata withScope(String scope) {
         this.scope = scope;
         return this;
     }
@@ -87,7 +86,7 @@ public final class BeanMetadata {
         return factoryMethodDescriptor;
     }
 
-    public ScopeType getScope() {
+    public String getScope() {
         return scope;
     }
 

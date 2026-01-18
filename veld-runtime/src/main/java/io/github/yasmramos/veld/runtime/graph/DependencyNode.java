@@ -1,7 +1,5 @@
 package io.github.yasmramos.veld.runtime.graph;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
-
 import java.util.*;
 
 /**
@@ -11,7 +9,7 @@ public final class DependencyNode {
     private final String className;
     private final String simpleName;
     private final String componentName;
-    private final ScopeType scope;
+    private final String scope;
     private boolean isPrimary;
     private final Set<String> profiles = new HashSet<>();
     private final List<String> constructorDependencies = new ArrayList<>();
@@ -19,7 +17,7 @@ public final class DependencyNode {
     private final List<String> methodDependencies = new ArrayList<>();
     private final List<String> interfaces = new ArrayList<>();
     
-    public DependencyNode(String className, String componentName, ScopeType scope) {
+    public DependencyNode(String className, String componentName, String scope) {
         this.className = className;
         this.simpleName = extractSimpleName(className);
         this.componentName = componentName;
@@ -40,7 +38,7 @@ public final class DependencyNode {
     public String getClassName() { return className; }
     public String getSimpleName() { return simpleName; }
     public String getComponentName() { return componentName; }
-    public ScopeType getScope() { return scope; }
+    public String getScope() { return scope; }
     public boolean isPrimary() { return isPrimary; }
     public Set<String> getProfiles() { return profiles; }
     public List<String> getConstructorDependencies() { return constructorDependencies; }

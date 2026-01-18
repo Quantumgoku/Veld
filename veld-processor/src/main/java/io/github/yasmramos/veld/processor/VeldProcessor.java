@@ -558,7 +558,7 @@ public class VeldProcessor extends AbstractProcessor {
         }
         
         // Determine scope and check for @Lazy
-        ScopeType scope = determineScope(typeElement);
+        String scope = determineScope(typeElement);
         boolean isLazy = typeElement.getAnnotation(Lazy.class) != null;
         
         // Check for @Primary annotation
@@ -634,44 +634,51 @@ public class VeldProcessor extends AbstractProcessor {
      * Determines the scope of a component based on its annotations.
      * @Prototype takes precedence for prototype scope.
      * @RequestScoped and @SessionScoped are recognized for web scopes.
-     * All other scope annotations (Veld @Singleton, javax/jakarta @Singleton) result in SINGLETON.
-     * Default is SINGLETON if no explicit scope is specified.
+     * All other scope annotations (Veld @Singleton, javax/jakarta @Singleton) result in "singleton".
+     * Default is "singleton" if no explicit scope is specified.
      */
-    private ScopeType determineScope(TypeElement typeElement) {
+    private String determineScope(TypeElement typeElement) {
         // Check for @Prototype first - it's the only way to get prototype scope
         if (typeElement.getAnnotation(Prototype.class) != null) {
-            note("  -> Scope: PROTOTYPE");
-            return ScopeType.PROTOTYPE;
+            note("  -> Scope: prototype");
+            return "prototype";
         }
         
         // Check for @RequestScoped
         if (typeElement.getAnnotation(io.github.yasmramos.veld.annotation.RequestScoped.class) != null) {
-            note("  -> Scope: REQUEST");
-            return ScopeType.REQUEST;
+            note("  -> Scope: request");
+            return "request";
         }
         
         // Check for @SessionScoped
         if (typeElement.getAnnotation(io.github.yasmramos.veld.annotation.SessionScoped.class) != null) {
-            note("  -> Scope: SESSION");
-            return ScopeType.SESSION;
+            note("  -> Scope: session");
+            return "session";
         }
         
         // Check for explicit singleton annotations
         if (typeElement.getAnnotation(Singleton.class) != null ||
             AnnotationHelper.hasSingletonAnnotation(typeElement)) {
-            note("  -> Scope: SINGLETON (explicit)");
-            return ScopeType.SINGLETON;
+            note("  -> Scope: singleton (explicit)");
+            return "singleton";
         }
         
         // Check for @Lazy alone (implies singleton)
         if (typeElement.getAnnotation(Lazy.class) != null) {
-            note("  -> Scope: SINGLETON (from @Lazy)");
-            return ScopeType.SINGLETON;
+            note("  -> Scope: singleton (from @Lazy)");
+            return "singleton";
+        }
+        
+        // Check for @Scope annotation with custom value
+        java.util.Optional<String> scopeValue = AnnotationHelper.getScopeValue(typeElement);
+        if (scopeValue.isPresent()) {
+            note("  -> Scope: " + scopeValue.get());
+            return scopeValue.get();
         }
         
         // Default scope
-        note("  -> Scope: SINGLETON (default)");
-        return ScopeType.SINGLETON;
+        note("  -> Scope: singleton (default)");
+        return "singleton";
     }
     
     /**
@@ -856,7 +863,7 @@ public class VeldProcessor extends AbstractProcessor {
             }
             
             if (visibility == InjectionPoint.Visibility.PRIVATE) {
-                note("  -> Private field injection: " + field.getSimpleName() + " (requires veld-weaver plugin)");
+                note("  -> Private field injection: " + field.getSimpleName() + " (requires accessor class)");
             }
             
             Dependency dep = createDependency(field);
@@ -887,6 +894,22 @@ public class VeldProcessor extends AbstractProcessor {
         }
     }
     
+    /**
+     * Determines the visibility of a method.
+     */
+    private InjectionPoint.Visibility getMethodVisibility(ExecutableElement method) {
+        Set<Modifier> modifiers = method.getModifiers();
+        if (modifiers.contains(Modifier.PRIVATE)) {
+            return InjectionPoint.Visibility.PRIVATE;
+        } else if (modifiers.contains(Modifier.PROTECTED)) {
+            return InjectionPoint.Visibility.PROTECTED;
+        } else if (modifiers.contains(Modifier.PUBLIC)) {
+            return InjectionPoint.Visibility.PUBLIC;
+        } else {
+            return InjectionPoint.Visibility.PACKAGE_PRIVATE;
+        }
+    }
+    
     private void analyzeMethods(TypeElement typeElement, ComponentInfo info) throws ProcessingException {
         for (Element enclosed : typeElement.getEnclosedElements()) {
             if (enclosed.getKind() != ElementKind.METHOD) continue;
@@ -905,9 +928,16 @@ public class VeldProcessor extends AbstractProcessor {
                 throw new ProcessingException("@Inject cannot be applied to abstract methods: " + method.getSimpleName());
             }
             
+            // Get visibility for private method detection
+            InjectionPoint.Visibility visibility = getMethodVisibility(method);
+            
             // Log which annotation specification is being used
             if (injectSource.isStandard()) {
                 note("  -> Using " + injectSource.getPackageName() + ".Inject for method: " + method.getSimpleName());
+            }
+            
+            if (visibility == InjectionPoint.Visibility.PRIVATE) {
+                note("  -> Private method injection: " + method.getSimpleName() + " (requires accessor class)");
             }
             
             List<Dependency> dependencies = new ArrayList<>();
@@ -920,7 +950,8 @@ public class VeldProcessor extends AbstractProcessor {
                     InjectionPoint.Type.METHOD,
                     method.getSimpleName().toString(),
                     descriptor,
-                    dependencies));
+                    dependencies,
+                    visibility));
         }
     }
     
@@ -1644,8 +1675,43 @@ public class VeldProcessor extends AbstractProcessor {
             
             note("Generated " + (profileNodes.size() + 1) + " Veld class files");
             
+            // Generate accessor classes for components with private field/method injection
+            generateAccessorClasses();
+            
         } catch (IOException e) {
             error(null, "Failed to generate Veld class files: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Generates accessor classes for components with private field/method injection.
+     * Each accessor class is placed in the same package as its target component.
+     */
+    private void generateAccessorClasses() {
+        int accessorCount = 0;
+        
+        for (VeldNode node : veldNodes) {
+            if (!node.needsAccessorClass()) {
+                continue;
+            }
+            
+            try {
+                VeldSourceGenerator sourceGen = new VeldSourceGenerator(
+                    List.of(node), messager, node.getPackageName(), node.getAccessorSimpleName());
+                Map<String, com.squareup.javapoet.JavaFile> accessorFiles = sourceGen.generateAccessorClasses();
+                
+                for (com.squareup.javapoet.JavaFile accessorFile : accessorFiles.values()) {
+                    writeJavaSource(accessorFile);
+                    accessorCount++;
+                    note("Generated accessor class: " + accessorFile.typeSpec.name);
+                }
+            } catch (Exception e) {
+                error(null, "Failed to generate accessor class for " + node.getClassName() + ": " + e.getMessage());
+            }
+        }
+        
+        if (accessorCount > 0) {
+            note("Generated " + accessorCount + " accessor class(es) for private member injection");
         }
     }
     
@@ -2047,7 +2113,7 @@ public class VeldProcessor extends AbstractProcessor {
         sb.append(comp.getClassName()).append("||");
         
         // scope
-        sb.append(comp.getScope().name()).append("||");
+        sb.append(comp.getScope()).append("||");
         
         // lazy
         sb.append(comp.isLazy()).append("||");
@@ -2276,10 +2342,12 @@ public class VeldProcessor extends AbstractProcessor {
             node.setConstructorInfo(ctorInfo);
         }
 
-        // Convert field injections
+        // Convert field injections - pass visibility info
         for (InjectionPoint field : info.getFieldInjections()) {
             if (!field.getDependencies().isEmpty()) {
                 InjectionPoint.Dependency dep = field.getDependencies().get(0);
+                boolean isPrivate = field.getVisibility() == InjectionPoint.Visibility.PRIVATE;
+                boolean isPublic = field.getVisibility() == InjectionPoint.Visibility.PUBLIC;
                 VeldNode.FieldInjection fieldInjection = new VeldNode.FieldInjection(
                     field.getName(),
                     dep.getTypeName(),
@@ -2287,15 +2355,19 @@ public class VeldProcessor extends AbstractProcessor {
                     dep.isOptional(),
                     dep.isOptionalWrapper(),
                     dep.getActualTypeName(),
-                    dep.getQualifierName()
+                    dep.getQualifierName(),
+                    isPrivate,
+                    isPublic,
+                    dep.isValueInjection()
                 );
                 node.addFieldInjection(fieldInjection);
             }
         }
 
-        // Convert method injections
+        // Convert method injections - pass isPrivate flag
         for (InjectionPoint method : info.getMethodInjections()) {
-            VeldNode.MethodInjection methodInjection = new VeldNode.MethodInjection(method.getName());
+            boolean isPrivate = method.getVisibility() == InjectionPoint.Visibility.PRIVATE;
+            VeldNode.MethodInjection methodInjection = new VeldNode.MethodInjection(method.getName(), isPrivate);
             for (InjectionPoint.Dependency dep : method.getDependencies()) {
                 VeldNode.ParameterInfo paramInfo = convertDependencyToParameter(dep);
                 methodInjection.addParameter(paramInfo);

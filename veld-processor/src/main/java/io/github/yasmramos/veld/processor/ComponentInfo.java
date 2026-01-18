@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.processor;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import javax.lang.model.element.TypeElement;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,10 +11,13 @@ import java.util.stream.Collectors;
  */
 public final class ComponentInfo {
     
+    private static final String SCOPE_SINGLETON = "singleton";
+    private static final String SCOPE_PROTOTYPE = "prototype";
+    
     private String className;              // Fully qualified: com.example.MyService
     private String internalName;           // ASM internal: com/example/MyService
     private final String componentName;          // @Component value or simple class name
-    private final ScopeType scope;                   // SINGLETON or PROTOTYPE
+    private final String scope;                   // "singleton", "prototype", or custom scope ID
     private String scopeId;                // Custom scope ID (null for built-in scopes)
     private final boolean lazy;                  // @Lazy - deferred initialization
     
@@ -44,23 +46,23 @@ public final class ComponentInfo {
     // TypeElement for AOP processing (transient - not serialized)
     private transient TypeElement typeElement;
     
-    public ComponentInfo(String className, String componentName, ScopeType scope) {
+    public ComponentInfo(String className, String componentName, String scope) {
         this(className, componentName, scope, null, false);
     }
     
-    public ComponentInfo(String className, String componentName, ScopeType scope, String scopeId) {
+    public ComponentInfo(String className, String componentName, String scope, String scopeId) {
         this(className, componentName, scope, scopeId, false);
     }
     
-    public ComponentInfo(String className, String componentName, ScopeType scope, String scopeId, boolean lazy) {
+    public ComponentInfo(String className, String componentName, String scope, String scopeId, boolean lazy) {
         this(className, componentName, scope, scopeId, lazy, false);
     }
     
-    public ComponentInfo(String className, String componentName, ScopeType scope, String scopeId, boolean lazy, boolean isPrimary) {
+    public ComponentInfo(String className, String componentName, String scope, String scopeId, boolean lazy, boolean isPrimary) {
         this.className = className;
         this.internalName = className.replace('.', '/');
         this.componentName = componentName;
-        this.scope = scope;
+        this.scope = scope != null ? scope : SCOPE_SINGLETON;
         this.scopeId = scopeId;
         this.lazy = lazy;
         this.isPrimary = isPrimary;
@@ -115,13 +117,31 @@ public final class ComponentInfo {
         return componentName;
     }
     
-    public ScopeType getScope() {
+    public String getScope() {
         return scope;
     }
     
     /**
+     * Returns whether this component is a singleton.
+     * 
+     * @return true if scope is "singleton"
+     */
+    public boolean isSingleton() {
+        return SCOPE_SINGLETON.equals(scope);
+    }
+    
+    /**
+     * Returns whether this component is a prototype.
+     * 
+     * @return true if scope is "prototype"
+     */
+    public boolean isPrototype() {
+        return SCOPE_PROTOTYPE.equals(scope);
+    }
+    
+    /**
      * Returns the scope ID for this component.
-     * For built-in scopes (singleton, prototype), returns the scope enum name.
+     * For built-in scopes (singleton, prototype), returns the scope string.
      * For custom scopes, returns the custom scope ID.
      * 
      * @return the scope identifier string
@@ -130,7 +150,7 @@ public final class ComponentInfo {
         if (scopeId != null && !scopeId.isEmpty()) {
             return scopeId;
         }
-        return scope != null ? scope.getScopeId() : "singleton";
+        return scope != null ? scope : SCOPE_SINGLETON;
     }
     
     /**
@@ -589,7 +609,7 @@ public final class ComponentInfo {
      */
     public boolean canUseHolderPattern() {
         // Holder pattern only makes sense for singletons
-        if (scope != ScopeType.SINGLETON) {
+        if (!SCOPE_SINGLETON.equals(scope)) {
             return false;
         }
 
@@ -643,8 +663,8 @@ public final class ComponentInfo {
      * @return description of the first blocking condition, or null if holder pattern is allowed
      */
     public String getHolderPatternRestriction() {
-        if (scope != ScopeType.SINGLETON) {
-            return "scope=" + scope + " (only SINGLETON supported)";
+        if (!SCOPE_SINGLETON.equals(scope)) {
+            return "scope=" + scope + " (only singleton supported)";
         }
         if (lazy) {
             return "lazy=true (holder pattern requires eager initialization)";

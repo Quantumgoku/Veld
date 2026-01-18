@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.runtime;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.condition.ConditionContext;
 
 import java.util.*;
@@ -181,7 +180,7 @@ public final class ConditionalRegistry implements ComponentRegistry {
         }
 
         // For singleton scope, use the cache
-        if (factory.getScope() == ScopeType.SINGLETON) {
+        if ("singleton".equals(factory.getScope())) {
             // We need to maintain a separate singleton cache for ConditionalRegistry
             // since the original registry's cache may contain excluded components
             return getOrCreateSingleton(type, factory);

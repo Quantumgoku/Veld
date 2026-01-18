@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.processor.spi;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.processor.ComponentInfo;
 import io.github.yasmramos.veld.processor.InjectionPoint;
 import io.github.yasmramos.veld.spi.extension.ComponentNode;
@@ -22,6 +21,8 @@ import java.util.Optional;
  * @version 1.0.0
  */
 final class SpiComponentNode implements ComponentNode {
+    
+    private static final String SCOPE_SINGLETON = "singleton";
     
     private final ComponentInfo componentInfo;
     private final List<DependencyEdge> dependencies;
@@ -67,7 +68,7 @@ final class SpiComponentNode implements ComponentNode {
     }
     
     @Override
-    public ScopeType getScope() {
+    public String getScope() {
         return componentInfo.getScope();
     }
     
@@ -118,7 +119,7 @@ final class SpiComponentNode implements ComponentNode {
     
     @Override
     public boolean isSingleton() {
-        return componentInfo.getScope() == ScopeType.SINGLETON;
+        return SCOPE_SINGLETON.equals(componentInfo.getScope());
     }
     
     @Override

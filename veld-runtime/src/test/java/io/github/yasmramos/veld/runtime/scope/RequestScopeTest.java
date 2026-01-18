@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.runtime.scope;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.ComponentFactory;
 import org.junit.jupiter.api.*;
 
@@ -405,8 +404,8 @@ class RequestScopeTest {
             }
             
             @Override
-            public ScopeType getScope() {
-                return ScopeType.REQUEST;
+            public String getScope() {
+                return "request";
             }
             
             @Override

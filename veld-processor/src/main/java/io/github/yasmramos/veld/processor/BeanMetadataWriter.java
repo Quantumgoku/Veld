@@ -53,7 +53,7 @@ public final class BeanMetadataWriter {
             entry.name = bean.getBeanName();
             entry.type = bean.getBeanType();
             entry.factoryClass = bean.getFactoryClassName();
-            entry.scope = bean.getScope() != null ? bean.getScope().name() : "SINGLETON";
+            entry.scope = bean.getScope() != null ? bean.getScope() : "singleton";
             entry.qualifier = bean.getQualifier();
             entry.isPrimary = bean.isPrimary();
             entry.dependencies = bean.getDependencies();

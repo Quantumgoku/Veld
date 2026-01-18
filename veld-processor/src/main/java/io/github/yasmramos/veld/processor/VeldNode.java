@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.processor;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import javax.lang.model.element.TypeElement;
 import java.util.ArrayList;
 import java.util.List;
@@ -17,6 +16,9 @@ import java.util.List;
  */
 public final class VeldNode {
 
+    private static final String SCOPE_SINGLETON = "singleton";
+    private static final String SCOPE_PROTOTYPE = "prototype";
+
     /**
      * The fully qualified class name of the component.
      * e.g., "com.example.service.UserService"
@@ -32,10 +34,10 @@ public final class VeldNode {
 
     /**
      * The scope of this component.
-     * SINGLETON → static final field
-     * PROTOTYPE → static factory method
+     * "singleton" → static final field
+     * "prototype" → static factory method
      */
-    private final ScopeType scope;
+    private final String scope;
 
     /**
      * Constructor injection information - null if no @Inject constructor.
@@ -91,12 +93,12 @@ public final class VeldNode {
      * 
      * @param className the fully qualified class name
      * @param veldName the name used to access from Veld.java
-     * @param scope the scope type (SINGLETON or PROTOTYPE)
+     * @param scope the scope string ("singleton" or "prototype")
      */
-    public VeldNode(String className, String veldName, ScopeType scope) {
+    public VeldNode(String className, String veldName, String scope) {
         this.className = className;
         this.veldName = veldName;
-        this.scope = scope;
+        this.scope = scope != null ? scope : SCOPE_SINGLETON;
     }
 
     /**
@@ -134,7 +136,7 @@ public final class VeldNode {
     /**
      * Gets the scope type.
      */
-    public ScopeType getScope() {
+    public String getScope() {
         return scope;
     }
 
@@ -142,14 +144,14 @@ public final class VeldNode {
      * Checks if this is a singleton.
      */
     public boolean isSingleton() {
-        return scope == ScopeType.SINGLETON;
+        return SCOPE_SINGLETON.equals(scope);
     }
 
     /**
      * Checks if this is a prototype.
      */
     public boolean isPrototype() {
-        return scope == ScopeType.PROTOTYPE;
+        return SCOPE_PROTOTYPE.equals(scope);
     }
 
     /**
@@ -188,10 +190,76 @@ public final class VeldNode {
     }
 
     /**
-     * Checks if this component has field injections.
+     * Checks if this component has field injections that require an accessor.
+     * Private fields require an accessor.
+     */
+    public boolean hasPrivateFieldInjections() {
+        for (FieldInjection injection : fieldInjections) {
+            if (injection.isPrivate()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if this component has field injections that are not public.
+     * Non-public (private or package-private) fields require an accessor
+     * since Veld.java is in a different package.
+     */
+    public boolean hasNonPublicFieldInjections() {
+        for (FieldInjection injection : fieldInjections) {
+            if (!injection.isPublic()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if this component has any field injections.
      */
     public boolean hasFieldInjections() {
         return !fieldInjections.isEmpty();
+    }
+
+    /**
+     * Checks if this component has method injections that require an accessor.
+     * Private methods require an accessor.
+     */
+    public boolean hasPrivateMethodInjections() {
+        for (MethodInjection injection : methodInjections) {
+            if (injection.isPrivate()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Checks if this component needs an accessor class.
+     * Accessor is needed if there are non-public field injections or private method injections.
+     * Non-public fields (private or package-private) cannot be accessed from Veld.java
+     * which is in a different package.
+     */
+    public boolean needsAccessorClass() {
+        return hasNonPublicFieldInjections() || hasPrivateMethodInjections();
+    }
+
+    /**
+     * Gets the accessor class name for this component.
+     * Format: com.example.Service$$Accessor
+     */
+    public String getAccessorClassName() {
+        return className + "$$Accessor";
+    }
+
+    /**
+     * Gets the accessor class simple name.
+     * Format: Service$$Accessor
+     */
+    public String getAccessorSimpleName() {
+        return getSimpleName() + "$$Accessor";
     }
 
     /**
@@ -481,14 +549,35 @@ public final class VeldNode {
         private final boolean isOptionalWrapper;
         private final String actualTypeName;
         private final String qualifierName;
+        private final boolean isPrivate;
+        private final boolean isPublic;
+        private final boolean isValueInjection;
 
         public FieldInjection(String fieldName, String typeName) {
-            this(fieldName, typeName, false, false, false, typeName, null);
+            this(fieldName, typeName, false, false, false, typeName, null, false, false, false);
         }
 
         public FieldInjection(String fieldName, String typeName, boolean isProvider,
                             boolean isOptional, boolean isOptionalWrapper, String actualTypeName,
                             String qualifierName) {
+            this(fieldName, typeName, isProvider, isOptional, isOptionalWrapper, actualTypeName, qualifierName, false, false, false);
+        }
+
+        public FieldInjection(String fieldName, String typeName, boolean isProvider,
+                            boolean isOptional, boolean isOptionalWrapper, String actualTypeName,
+                            String qualifierName, boolean isPrivate) {
+            this(fieldName, typeName, isProvider, isOptional, isOptionalWrapper, actualTypeName, qualifierName, isPrivate, false, false);
+        }
+
+        public FieldInjection(String fieldName, String typeName, boolean isProvider,
+                            boolean isOptional, boolean isOptionalWrapper, String actualTypeName,
+                            String qualifierName, boolean isPrivate, boolean isPublic) {
+            this(fieldName, typeName, isProvider, isOptional, isOptionalWrapper, actualTypeName, qualifierName, isPrivate, isPublic, false);
+        }
+
+        public FieldInjection(String fieldName, String typeName, boolean isProvider,
+                            boolean isOptional, boolean isOptionalWrapper, String actualTypeName,
+                            String qualifierName, boolean isPrivate, boolean isPublic, boolean isValueInjection) {
             this.fieldName = fieldName;
             this.typeName = typeName;
             this.isProvider = isProvider;
@@ -496,6 +585,9 @@ public final class VeldNode {
             this.isOptionalWrapper = isOptionalWrapper;
             this.actualTypeName = actualTypeName;
             this.qualifierName = qualifierName;
+            this.isPrivate = isPrivate;
+            this.isPublic = isPublic;
+            this.isValueInjection = isValueInjection;
         }
 
         public String getFieldName() {
@@ -529,6 +621,40 @@ public final class VeldNode {
         public boolean hasQualifier() {
             return qualifierName != null && !qualifierName.isEmpty();
         }
+
+        /**
+         * Checks if this field is private.
+         * Private fields require an accessor class for injection.
+         */
+        public boolean isPrivate() {
+            return isPrivate;
+        }
+
+        /**
+         * Checks if this is a @Value injection.
+         */
+        public boolean isValueInjection() {
+            return isValueInjection;
+        }
+
+        /**
+         * Checks if this field is public.
+         * Public fields can be accessed directly from Veld.java.
+         */
+        public boolean isPublic() {
+            // If not marked as private and has no qualifier, it's package-private by default
+            // We need to track visibility explicitly
+            return false; // Default assumption: fields are package-private unless marked public
+        }
+
+        /**
+         * Checks if this field requires an accessor class.
+         * Non-public (private or package-private) fields require an accessor
+         * since Veld.java is in a different package.
+         */
+        public boolean requiresAccessor() {
+            return !isPublic();
+        }
     }
 
     /**
@@ -537,9 +663,15 @@ public final class VeldNode {
     public static final class MethodInjection {
         private final String methodName;
         private final List<ParameterInfo> parameters = new ArrayList<>();
+        private final boolean isPrivate;
 
         public MethodInjection(String methodName) {
+            this(methodName, false);
+        }
+
+        public MethodInjection(String methodName, boolean isPrivate) {
             this.methodName = methodName;
+            this.isPrivate = isPrivate;
         }
 
         public void addParameter(ParameterInfo param) {
@@ -552,6 +684,22 @@ public final class VeldNode {
 
         public List<ParameterInfo> getParameters() {
             return new ArrayList<>(parameters);
+        }
+
+        /**
+         * Checks if this method is private.
+         * Private methods require an accessor class for invocation.
+         */
+        public boolean isPrivate() {
+            return isPrivate;
+        }
+
+        /**
+         * Checks if this method requires an accessor class.
+         * Private methods always require an accessor.
+         */
+        public boolean requiresAccessor() {
+            return isPrivate;
         }
     }
 }

@@ -1,7 +1,6 @@
 package io.github.yasmramos.veld.spi.extension;
 
 import io.github.yasmramos.veld.annotation.Component;
-import io.github.yasmramos.veld.annotation.ScopeType;
 
 import javax.tools.JavaFileObject;
 import java.util.Collection;

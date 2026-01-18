@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.runtime.graph;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import java.io.IOException;
 import java.io.Writer;
 import java.util.*;
@@ -100,15 +99,16 @@ public final class DotExporter implements GraphExporter {
     /**
      * Gets the DOT shape for a given scope.
      */
-    private String getShapeForScope(ScopeType scope) {
+    private String getShapeForScope(String scope) {
         if (scope == null) {
             return "box";
         }
         return switch (scope) {
-            case SINGLETON -> "box";
-            case PROTOTYPE -> "oval";
-            case REQUEST -> "diamond";
-            case SESSION -> "folder";
+            case "singleton" -> "box";
+            case "prototype" -> "oval";
+            case "request" -> "diamond";
+            case "session" -> "folder";
+            default -> "box";
         };
     }
     

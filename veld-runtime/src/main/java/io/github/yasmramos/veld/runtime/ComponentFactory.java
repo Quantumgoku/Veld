@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.runtime;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.condition.ConditionContext;
 import io.github.yasmramos.veld.runtime.condition.ConditionEvaluator;
 import java.util.Collections;
@@ -40,9 +39,9 @@ public interface ComponentFactory<T> {
     /**
      * Returns the scope of the component.
      *
-     * @return the component scope
+     * @return the component scope as a string (e.g., "singleton", "prototype")
      */
-    ScopeType getScope();
+    String getScope();
     
     /**
      * Returns the scope ID for this component.
@@ -52,7 +51,7 @@ public interface ComponentFactory<T> {
      * @return the scope identifier string
      */
     default String getScopeId() {
-        return getScope().getScopeId();
+        return getScope();
     }
     
     /**

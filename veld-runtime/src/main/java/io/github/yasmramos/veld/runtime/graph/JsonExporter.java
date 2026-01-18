@@ -1,7 +1,5 @@
 package io.github.yasmramos.veld.runtime.graph;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
-
 import java.io.IOException;
 import java.io.Writer;
 import java.util.*;

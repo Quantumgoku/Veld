@@ -1,7 +1,5 @@
 package io.github.yasmramos.veld.spi.extension;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
-
 import javax.lang.model.element.Element;
 import javax.lang.model.type.TypeMirror;
 import java.util.Collection;
@@ -11,12 +9,12 @@ import java.util.Optional;
 /**
  * Representa un nodo de componente en el grafo de dependencias de Veld.
  * 
- * <p>Un ComponentNode encapsula toda la información relevante sobre un componente
- * registrado en el sistema, incluyendo sus dependencias, su ámbito de inyección,
+ * <p>Un ComponentNode encapsula toda la informacion relevante sobre un componente
+ * registrado en el sistema, incluyendo sus dependencias, su ambito de inyeccion,
  * su elemento de origen y metadatos adicionales.</p>
  * 
  * <p><strong>Identidad del componente:</strong></p>
- * <p>Cada componente tiene un nombre cualificado único que lo identifica dentro
+ * <p>Cada componente tiene un nombre cualificado unico que lo identifica dentro
  * del grafo. Este nombre se deriva del paquete y nombre de clase del componente.</p>
  * 
  * <p><strong>Dependencias:</strong></p>
@@ -25,10 +23,10 @@ import java.util.Optional;
  * 
  * <p><strong>Ejemplo de uso:</strong></p>
  * <pre>{@code
- * // Obtener información del componente
+ * // Obtener informacion del componente
  * String name = component.getQualifiedName();
  * String simpleName = component.getSimpleName();
- * ScopeType scope = component.getScope();
+ * String scope = component.getScope();
  * 
  // Acceder al elemento de origen para reportes
  * Element element = component.getElement();
@@ -43,7 +41,7 @@ import java.util.Optional;
  // Obtener inyectores (componentes que dependen de este)
  * List<DependencyEdge> injectors = component.getInjectors();
  * }</pre>
- * 
+ *
  * @author Veld Team
  * @version 1.0.0
  */
@@ -64,29 +62,29 @@ public interface ComponentNode {
     String getSimpleName();
     
     /**
-     * Returns el paquete donde está definida la clase del componente.
+     * Returns el paquete donde esta definida la clase del componente.
      * 
      * @return el nombre del paquete
      */
     String getPackageName();
     
     /**
-     * Returns el ámbito de inyección del componente.
+     * Returns el ambito de inyeccion del componente.
      * 
-     * <p>El ámbito determina el ciclo de vida y la política de reutilización
-     * de las instancias del componente. Los ámbitos comunes incluyen SINGLETON,
-     * PROTOTYPE y APPLICATION.</p>
+     * <p>El ambito determina el ciclo de vida y la politica de reutilizacion
+     * de las instancias del componente. Los ambitos comunes incluyen "singleton",
+     * "prototype" y "application".</p>
      * 
-     * @return el tipo de ámbito
+     * @return el identificador de ambito como string
      */
-    ScopeType getScope();
+    String getScope();
     
     /**
      * Returns el elemento de origen del componente.
      * 
      * <p>Este elemento es el AST node de Javac correspondiente a la clase del
-     * componente. Se puede utilizar para obtener información adicional sobre el
-     * elemento, como su posición en el código fuente para reportes de errores.</p>
+     * componente. Se puede utilizar para obtener informacion adicional sobre el
+     * elemento, como su posicion en el codigo fuente para reportes de errores.</p>
      * 
      * @return el elemento de origen
      */
@@ -95,8 +93,8 @@ public interface ComponentNode {
     /**
      * Returns el tipo mirror del componente.
      * 
-     * <p>El TypeMirror proporciona información de tipos en tiempo de compilación,
-     * incluyendo interfaces implementadas, superclase y tipo genérico si aplica.</p>
+     * <p>El TypeMirror proporciona informacion de tipos en tiempo de compilacion,
+     * incluyendo interfaces implementadas, superclase y tipo generico si aplica.</p>
      * 
      * @return el tipo mirror del componente
      */
@@ -105,9 +103,9 @@ public interface ComponentNode {
     /**
      * Returns la lista de dependencias (aristas salientes) del componente.
      * 
-     * <p>Cada elemento de la lista representa una inyección que el componente
+     * <p>Cada elemento de la lista representa una inyeccion que el componente
      * necesita para funcionar. El orden en la lista refleja el orden en que
-     * las dependencias fueron declaradas en el código fuente.</p>
+     * las dependencias fueron declaradas en el codigo fuente.</p>
      * 
      * @return lista de aristas de dependencia salientes
      */
@@ -117,7 +115,7 @@ public interface ComponentNode {
      * Returns la lista de inyectores (componentes que dependen de este).
      * 
      * <p>Esta es la vista inversa del grafo: todos los componentes que tienen
-     * una arista hacia este nodo. Útil para análisis de impacto o para encontrar
+     * una arista hacia este nodo. Util para analisis de impacto o para encontrar
      * todos los consumidores de un servicio.</p>
      * 
      * @return lista de aristas de dependencia entrantes
@@ -125,14 +123,14 @@ public interface ComponentNode {
     List<DependencyEdge> getInjectors();
     
     /**
-     * Returns el número de dependencias directas del componente.
+     * Returns el numero de dependencias directas del componente.
      * 
      * @return cantidad de dependencias
      */
     int getDependencyCount();
     
     /**
-     * Returns el número de inyectores del componente.
+     * Returns el numero de inyectores del componente.
      * 
      * @return cantidad de inyectores
      */
@@ -147,7 +145,7 @@ public interface ComponentNode {
     boolean hasDependency(String targetName);
     
     /**
-     * Busca una dependencia específica por el nombre del componente objetivo.
+     * Busca una dependencia especifica por el nombre del componente objetivo.
      * 
      * @param targetName el nombre cualificado del componente objetivo
      * @return un Optional conteniendo la arista si existe
@@ -157,7 +155,7 @@ public interface ComponentNode {
     /**
      * Verifica si el componente es un singleton.
      * 
-     * <p>Shortcut para verificar si getScope() == ScopeType.SINGLETON.</p>
+     * <p>Shortcut para verificar si getScope() equals "singleton".</p>
      * 
      * @return true si el componente es singleton
      */
@@ -178,7 +176,7 @@ public interface ComponentNode {
     boolean hasInjectors();
     
     /**
-     * Returns una representación textual del componente para depuración.
+     * Returns una representacion textual del componente para depuracion.
      * 
      * @return string con formato "ComponentNode{name=...}"
      */

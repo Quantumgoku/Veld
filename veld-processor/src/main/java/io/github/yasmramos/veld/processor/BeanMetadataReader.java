@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.processor;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -183,12 +182,10 @@ public final class BeanMetadataReader {
         
         // Extract scope
         String scopeStr = extractStringValue(entry, "scope");
-        if (scopeStr != null) {
-            try {
-                bean = bean.withScope(ScopeType.valueOf(scopeStr.toUpperCase()));
-            } catch (Exception e) {
-                bean = bean.withScope(ScopeType.SINGLETON);
-            }
+        if (scopeStr != null && !scopeStr.isEmpty()) {
+            bean = bean.withScope(scopeStr);
+        } else {
+            bean = bean.withScope("singleton");
         }
         
         // Extract qualifier
@@ -258,7 +255,7 @@ public final class BeanMetadataReader {
             metadata.getBeanName(),
             typeElement.asType(),
             metadata.getFactoryClassName(),
-            metadata.getScope() != null ? metadata.getScope() : ScopeType.SINGLETON,
+            metadata.getScope() != null ? metadata.getScope() : "singleton",
             metadata.getQualifier(),
             metadata.isPrimary(),
             metadata.getDependencies()
@@ -334,18 +331,18 @@ public final class BeanMetadataReader {
         private final String beanName;
         private final TypeMirror beanType;
         private final String factoryClassName;
-        private final ScopeType scope;
+        private final String scope;  // "singleton", "prototype", or custom scope ID
         private final String qualifier;
         private final boolean isPrimary;
         private final List<String> dependencies;
 
         public ExternalBeanInfo(String beanName, TypeMirror beanType, String factoryClassName,
-                               ScopeType scope, String qualifier, boolean isPrimary,
+                               String scope, String qualifier, boolean isPrimary,
                                List<String> dependencies) {
             this.beanName = beanName;
             this.beanType = beanType;
             this.factoryClassName = factoryClassName;
-            this.scope = scope;
+            this.scope = scope != null ? scope : "singleton";
             this.qualifier = qualifier;
             this.isPrimary = isPrimary;
             this.dependencies = dependencies != null ? dependencies : Collections.emptyList();
@@ -363,7 +360,7 @@ public final class BeanMetadataReader {
             return factoryClassName;
         }
 
-        public ScopeType getScope() {
+        public String getScope() {
             return scope;
         }
 

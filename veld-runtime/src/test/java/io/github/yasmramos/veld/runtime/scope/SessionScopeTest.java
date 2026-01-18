@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.runtime.scope;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.ComponentFactory;
 import org.junit.jupiter.api.*;
 
@@ -547,8 +546,8 @@ class SessionScopeTest {
             }
             
             @Override
-            public ScopeType getScope() {
-                return ScopeType.SESSION;
+            public String getScope() {
+                return "session";
             }
             
             @Override

@@ -1,6 +1,5 @@
 package io.github.yasmramos.veld.runtime;
 
-import io.github.yasmramos.veld.annotation.ScopeType;
 import io.github.yasmramos.veld.runtime.condition.ConditionContext;
 import io.github.yasmramos.veld.runtime.graph.DependencyGraph;
 import io.github.yasmramos.veld.runtime.graph.DependencyNode;
@@ -28,7 +27,7 @@ class ComponentFactoryTest {
         void testDefaultGetIndex() {
             // Create factory without overriding getIndex()
             ComponentFactory<String> factory = new TestComponentFactoryWithoutIndex(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
 
             // This exercises the default getIndex() method in ComponentFactory
@@ -39,7 +38,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return custom index when overridden")
         void testCustomGetIndex() {
             ComponentFactory<String> factory = new TestComponentFactoryWithIndex(
-                0, "test", String.class, ScopeType.SINGLETON, 42
+                0, "test", String.class, "singleton", 42
             );
 
             assertEquals(42, factory.getIndex());
@@ -54,7 +53,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return false when conditions are not set")
         void testDefaultHasConditions() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutConditions(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
 
             // This exercises the default hasConditions() method
@@ -70,7 +69,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return true when no conditions are set")
         void testDefaultEvaluateConditions() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutConditions(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
 
             // This exercises the default evaluateConditions() method
@@ -85,9 +84,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactory(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactory(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -97,7 +96,7 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
+        @Override public String getScope() { return scope; }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -112,9 +111,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutIndex(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutIndex(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -123,7 +122,7 @@ class ComponentFactoryTest {
 
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
+        @Override public String getScope() { return scope; }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -135,10 +134,10 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
         private final int customIndex;
 
-        TestComponentFactoryWithIndex(int index, String name, Class<T> type, ScopeType scope, int customIndex) {
+        TestComponentFactoryWithIndex(int index, String name, Class<T> type, String scope, int customIndex) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -149,7 +148,7 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return customIndex; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
+        @Override public String getScope() { return scope; }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -159,9 +158,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutConditions(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutConditions(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -171,7 +170,7 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
+        @Override public String getScope() { return scope; }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -191,7 +190,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return lowercase scope name for singleton")
         void testDefaultGetScopeId_singleton() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutScopeId(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertEquals("singleton", factory.getScopeId());
         }
@@ -200,7 +199,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return lowercase scope name for prototype")
         void testDefaultGetScopeId_prototype() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutScopeId(
-                0, "test", String.class, ScopeType.PROTOTYPE
+                0, "test", String.class, "prototype"
             );
             assertEquals("prototype", factory.getScopeId());
         }
@@ -211,7 +210,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -233,7 +232,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return false by default")
         void testDefaultIsLazy() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutIsLazy(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertFalse(factory.isLazy());
         }
@@ -244,7 +243,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -266,7 +265,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return null by default")
         void testDefaultCreateConditionEvaluator() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutConditionEvaluator(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertNull(factory.createConditionEvaluator());
         }
@@ -280,7 +279,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return empty list by default")
         void testDefaultGetImplementedInterfaces() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutImplementedInterfaces(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertTrue(factory.getImplementedInterfaces().isEmpty());
         }
@@ -294,7 +293,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return false by default")
         void testDefaultIsPrimary() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutPrimary(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertFalse(factory.isPrimary());
         }
@@ -305,7 +304,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -327,7 +326,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return 0 by default")
         void testDefaultGetOrder() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutOrder(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertEquals(0, factory.getOrder());
         }
@@ -338,7 +337,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -360,7 +359,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return null by default")
         void testDefaultGetQualifier() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutQualifier(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertNull(factory.getQualifier());
         }
@@ -371,7 +370,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -393,7 +392,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return null by default")
         void testDefaultGetFactoryClass() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutFactoryClass(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertNull(factory.getFactoryClass());
         }
@@ -404,7 +403,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -426,7 +425,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return null by default")
         void testDefaultGetBeanMethodName() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutBeanMethodName(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertNull(factory.getBeanMethodName());
         }
@@ -437,7 +436,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -459,7 +458,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return empty list by default")
         void testDefaultGetFactoryMethodParameters() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutFactoryMethodParameters(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertTrue(factory.getFactoryMethodParameters().isEmpty());
         }
@@ -473,7 +472,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return empty list by default")
         void testDefaultGetDestructionDependencies() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutDestructionDependencies(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertTrue(factory.getDestructionDependencies().isEmpty());
         }
@@ -487,7 +486,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return 0 by default")
         void testDefaultGetDestroyOrder() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutDestroyOrder(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertEquals(0, factory.getDestroyOrder());
         }
@@ -498,7 +497,7 @@ class ComponentFactoryTest {
             ComponentFactory<String> factory = new ComponentFactory<String>() {
                 @Override public String getComponentName() { return "test"; }
                 @Override public Class<String> getComponentType() { return String.class; }
-                @Override public ScopeType getScope() { return ScopeType.SINGLETON; }
+                @Override public String getScope() { return "singleton"; }
                 @Override public String create() { return null; }
                 @Override public void invokePostConstruct(String instance) {}
                 @Override public void invokePreDestroy(String instance) {}
@@ -520,7 +519,7 @@ class ComponentFactoryTest {
         @DisplayName("Should return empty list by default")
         void testDefaultGetDependencyTypes() {
             ComponentFactory<String> factory = new TestComponentFactoryWithoutDependencyTypes(
-                0, "test", String.class, ScopeType.SINGLETON
+                0, "test", String.class, "singleton"
             );
             assertTrue(factory.getDependencyTypes().isEmpty());
         }
@@ -532,9 +531,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutScopeId(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutScopeId(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -544,7 +543,7 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
+        @Override public String getScope() { return scope; }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -556,9 +555,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutIsLazy(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutIsLazy(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -568,8 +567,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -581,9 +580,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutConditionEvaluator(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutConditionEvaluator(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -593,8 +592,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -606,9 +605,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutImplementedInterfaces(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutImplementedInterfaces(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -618,8 +617,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -631,9 +630,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutPrimary(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutPrimary(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -643,8 +642,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -656,9 +655,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutOrder(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutOrder(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -668,8 +667,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -681,9 +680,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutQualifier(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutQualifier(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -693,8 +692,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -706,9 +705,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutFactoryClass(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutFactoryClass(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -718,8 +717,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -731,9 +730,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutBeanMethodName(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutBeanMethodName(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -743,8 +742,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -756,9 +755,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutFactoryMethodParameters(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutFactoryMethodParameters(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -768,8 +767,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -781,9 +780,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutDestructionDependencies(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutDestructionDependencies(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -793,8 +792,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -806,9 +805,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutDestroyOrder(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutDestroyOrder(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -818,8 +817,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
@@ -831,9 +830,9 @@ class ComponentFactoryTest {
         private final int index;
         private final String name;
         private final Class<T> type;
-        private final ScopeType scope;
+        private final String scope;
 
-        TestComponentFactoryWithoutDependencyTypes(int index, String name, Class<T> type, ScopeType scope) {
+        TestComponentFactoryWithoutDependencyTypes(int index, String name, Class<T> type, String scope) {
             this.index = index;
             this.name = name;
             this.type = type;
@@ -843,8 +842,8 @@ class ComponentFactoryTest {
         @Override public int getIndex() { return index; }
         @Override public String getComponentName() { return name; }
         @Override public Class<T> getComponentType() { return type; }
-        @Override public ScopeType getScope() { return scope; }
-        @Override public String getScopeId() { return scope.name().toLowerCase(); }
+        @Override public String getScope() { return scope; }
+        @Override public String getScopeId() { return scope.toLowerCase(); }
         @Override public T create() { return null; }
         @Override public void invokePostConstruct(T instance) {}
         @Override public void invokePreDestroy(T instance) {}
