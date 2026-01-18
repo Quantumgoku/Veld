@@ -88,7 +88,7 @@ import io.github.yasmramos.veld.Veld;
 
 public class Main {
     public static void main(String[] args) {
-        UserService userService = Veld.get(UserService.class);
+        UserService userService = Veld.userService();
         User user = userService.getUser(1L);
     }
 }
