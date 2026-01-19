@@ -85,16 +85,10 @@ public record PropertyCondition(
 
     /**
      * Sanitizes the property name to use it as a flag name.
+     * Uses same logic as GenerationContext.sanitize() for consistency.
      */
     private String sanitize(String name) {
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < name.length(); i++) {
-            char c = name.charAt(i);
-            if (Character.isJavaIdentifierPart(c)) {
-                result.append(c == '.' ? '_' : c);
-            }
-        }
-        return result.toString().toUpperCase();
+        return GenerationContext.sanitize(name);
     }
 
     /**

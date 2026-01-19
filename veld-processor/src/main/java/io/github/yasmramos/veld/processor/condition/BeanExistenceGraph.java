@@ -231,7 +231,7 @@ public final class BeanExistenceGraph {
      * Checks if a flag corresponds to a bean.
      */
     private boolean isBeanFlag(String flag) {
-        return flag.startsWith("BEAN_") || flag.startsWith("BEAN_NAME_");
+        return flag.startsWith("HAS_BEAN_") || flag.startsWith("BEAN_") || flag.startsWith("BEAN_NAME_");
     }
 
     /**
@@ -308,25 +308,20 @@ public final class BeanExistenceGraph {
 
     /**
      * Generates the existence flag name for a bean.
-     * The name includes the "HAS_BEAN_" prefix.
+     * The name includes the "HAS_BEAN_" prefix and uses only the simple class name.
      */
     public String getExistenceFlagName(String beanClassName) {
-        return "HAS_BEAN_" + sanitizeClassName(beanClassName);
+        // Extract only the simple class name (without package)
+        String simpleName = beanClassName.substring(beanClassName.lastIndexOf('.') + 1);
+        return "HAS_BEAN_" + sanitizeClassName(simpleName);
     }
 
     /**
      * Sanitizes a class name for use in a flag name.
-     * Converts special characters to underscores and uppercase.
+     * Converts to uppercase for consistency.
      */
     private String sanitizeClassName(String className) {
-        StringBuilder result = new StringBuilder();
-        for (int i = 0; i < className.length(); i++) {
-            char c = className.charAt(i);
-            if (Character.isJavaIdentifierPart(c)) {
-                result.append(c == '.' ? '_' : c);
-            }
-        }
-        return result.toString();
+        return className.toUpperCase();
     }
 
     /**

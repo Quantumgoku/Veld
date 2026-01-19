@@ -31,8 +31,10 @@ public record BeanPresenceCondition(
     boolean mustBePresent
 ) implements ConditionExpression {
 
-    private static final String BEAN_TYPE_PREFIX = "BEAN_";
-    private static final String BEAN_NAME_PREFIX = "BEAN_NAME_";
+    // Note: Using same prefix as GenerationContext.getFlagForBeanType()
+    // The flag names are generated with HAS_BEAN_ prefix and sanitized class names
+    private static final String BEAN_TYPE_PREFIX = "HAS_BEAN_";
+    private static final String BEAN_NAME_PREFIX = "HAS_BEAN_";
 
     public BeanPresenceCondition {
         if (beanTypes == null) {
@@ -112,11 +114,13 @@ public record BeanPresenceCondition(
         Set<String> flags = new LinkedHashSet<>();
 
         for (String type : beanTypes) {
-            flags.add(BEAN_TYPE_PREFIX + sanitize(type));
+            // Use same sanitization as GenerationContext.getFlagForBeanType()
+            flags.add(GenerationContext.getExistenceFlagName(type));
         }
 
         for (String name : beanNames) {
-            flags.add(BEAN_NAME_PREFIX + sanitize(name));
+            // Use GenerationContext.sanitize() for names
+            flags.add(BEAN_NAME_PREFIX + GenerationContext.sanitize(name));
         }
 
         return flags;
@@ -151,6 +155,7 @@ public record BeanPresenceCondition(
 
     /**
      * Sanitiza un nombre de clase para usarlo como nombre de flag.
+     * Uses same logic as GenerationContext.getExistenceFlagName() and GenerationContext.sanitize().
      */
     private String sanitize(String name) {
         StringBuilder result = new StringBuilder();

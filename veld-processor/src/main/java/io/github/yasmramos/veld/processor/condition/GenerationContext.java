@@ -57,7 +57,9 @@ public final class GenerationContext {
         for (int i = 0; i < beanType.length(); i++) {
             char c = beanType.charAt(i);
             if (Character.isJavaIdentifierPart(c)) {
-                result.append(c == '.' ? '_' : c);
+                result.append(c);
+            } else if (c == '.') {
+                result.append('_');
             }
         }
         return result.toString();
@@ -76,7 +78,9 @@ public final class GenerationContext {
         for (int i = 0; i < beanName.length(); i++) {
             char c = beanName.charAt(i);
             if (Character.isJavaIdentifierPart(c)) {
-                result.append(c == '.' ? '_' : c);
+                result.append(c);
+            } else if (c == '.') {
+                result.append('_');
             }
         }
         return result.toString();
@@ -133,7 +137,9 @@ public final class GenerationContext {
         for (int i = 0; i < identifier.length(); i++) {
             char c = identifier.charAt(i);
             if (Character.isJavaIdentifierPart(c)) {
-                result.append(c == '.' ? '_' : c);
+                result.append(c);
+            } else if (c == '.') {
+                result.append('_');
             }
         }
         return result.toString().toUpperCase();
@@ -141,17 +147,12 @@ public final class GenerationContext {
 
     /**
      * Genera el nombre del flag de existencia para un bean.
-     * El nombre incluye el prefijo "HAS_BEAN_".
+     * El nombre incluye el prefijo "HAS_BEAN_" y usa solo el nombre simple de la clase.
      */
     public static String getExistenceFlagName(String beanClassName) {
-        StringBuilder result = new StringBuilder("HAS_BEAN_");
-        for (int i = 0; i < beanClassName.length(); i++) {
-            char c = beanClassName.charAt(i);
-            if (Character.isJavaIdentifierPart(c)) {
-                result.append(c == '.' ? '_' : c);
-            }
-        }
-        return result.toString();
+        // Extraer solo el nombre simple de la clase (sin el paquete)
+        String simpleName = beanClassName.substring(beanClassName.lastIndexOf('.') + 1);
+        return "HAS_BEAN_" + sanitize(simpleName);
     }
 
     /**
