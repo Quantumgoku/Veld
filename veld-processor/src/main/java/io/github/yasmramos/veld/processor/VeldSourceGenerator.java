@@ -374,13 +374,14 @@ public final class VeldSourceGenerator {
         // Build lifecycle code
         CodeBlock lifecycleCode = buildPostConstructInvocation(node, fieldName);
         
-        // Add field declaration
+        // Add field declaration with volatile for thread-safe lazy access
         FieldSpec.Builder fieldBuilder = FieldSpec.builder(type, fieldName)
-                .addModifiers(Modifier.PRIVATE, Modifier.STATIC);
+                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE);
         
         // Initialize all fields to null to ensure definite assignment
         // All beans are now wrapped in existence flag checks, so we can't use 'final'
         // The fields are still effectively immutable (assigned once in static block)
+        // Volatile ensures visibility across threads for the double-checked locking pattern
         fieldBuilder.initializer("null");
         
         if (isConditional) {
@@ -417,14 +418,21 @@ public final class VeldSourceGenerator {
             staticInitBuilder.add(methodInjectionCode);
         }
         
-        // Add PostConstruct call
+        // Add PostConstruct call with error handling
         if (node.hasPostConstruct()) {
+            staticInitBuilder.addComment("Invoke @PostConstruct with error handling");
+            staticInitBuilder.beginControlFlow("try");
             if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
                 ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
                 staticInitBuilder.addStatement("$T.postConstruct($N)", accessorClass, fieldName);
             } else {
                 staticInitBuilder.addStatement("$N.$N()", fieldName, node.getPostConstructMethod());
             }
+            staticInitBuilder.endControlFlow();
+            staticInitBuilder.beginControlFlow("catch ($T e)", Exception.class);
+            staticInitBuilder.addStatement("throw new $T(\"Failed to initialize bean: \" + $S, e)",
+                ClassName.get("java.lang", "RuntimeException"), node.getClassName());
+            staticInitBuilder.endControlFlow();
         }
         
         staticInitBuilder.unindent();
@@ -567,7 +575,7 @@ public final class VeldSourceGenerator {
         List<VeldNode> preDestroyNodes = new ArrayList<>();
         for (int i = singletons.size() - 1; i >= 0; i--) {
             VeldNode node = singletons.get(i);
-            if (node.hasPreDestroy()) {
+            if (node.hasPreDestroy() || node.isAutoCloseable()) {
                 preDestroyNodes.add(node);
             }
         }
@@ -577,9 +585,9 @@ public final class VeldSourceGenerator {
                 .addJavadoc("Shuts down the Veld container and invokes @PreDestroy methods.\n\n" +
                             "<p>This method is <b>idempotent</b>: calling it multiple times is safe\n" +
                             "and will only invoke @PreDestroy methods once.</p>\n" +
-                            "<p>@PreDestroy methods are called in reverse dependency order,\n" +
-                            "ensuring dependents are destroyed before their dependencies.</p>\n" +
-                            "<p>Individual @PreDestroy failures are isolated and do not prevent\n" +
+                            "<p>@PreDestroy methods and close() for AutoCloseable beans are called\n" +
+                            "in reverse dependency order, ensuring dependents are destroyed before their dependencies.</p>\n" +
+                            "<p>Individual destruction failures are isolated and do not prevent\n" +
                             "other beans from being destroyed.</p>\n")
                 .addComment("Idempotency check - return early if already shutdown");
         shutdownBuilder.beginControlFlow("if ($N.getAndSet(true))", "shutdownInitiated");
@@ -587,20 +595,30 @@ public final class VeldSourceGenerator {
         shutdownBuilder.endControlFlow();
         
         if (preDestroyNodes.isEmpty()) {
-            shutdownBuilder.addStatement("// No @PreDestroy methods to invoke");
+            shutdownBuilder.addStatement("// No @PreDestroy or AutoCloseable beans to invoke");
         } else {
-            shutdownBuilder.addStatement("// Invoke @PreDestroy methods in reverse order (only for existing beans)");
+            shutdownBuilder.addStatement("// Invoke @PreDestroy and close() in reverse order (only for existing beans)");
             for (VeldNode node : preDestroyNodes) {
                 String nodeFlagName = graph.getExistenceFlagName(node.getClassName());
                 shutdownBuilder.addStatement("// $S", node.getClassName());
                 shutdownBuilder.beginControlFlow("if ($N)", nodeFlagName);
                 shutdownBuilder.beginControlFlow("try");
-                if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
-                    ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
-                    shutdownBuilder.addStatement("$T.preDestroy($N)", accessorClass, node.getVeldName());
-                } else {
-                    shutdownBuilder.addStatement("$N.$N()", node.getVeldName(), node.getPreDestroyMethod());
+                
+                // Call @PreDestroy if present
+                if (node.hasPreDestroy()) {
+                    if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
+                        ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
+                        shutdownBuilder.addStatement("$T.preDestroy($N)", accessorClass, node.getVeldName());
+                    } else {
+                        shutdownBuilder.addStatement("$N.$N()", node.getVeldName(), node.getPreDestroyMethod());
+                    }
                 }
+                
+                // Call close() if bean is AutoCloseable
+                if (node.isAutoCloseable()) {
+                    shutdownBuilder.addStatement("$N.close()", node.getVeldName());
+                }
+                
                 shutdownBuilder.endControlFlow();
                 shutdownBuilder.beginControlFlow("catch ($T e)", Exception.class);
                 shutdownBuilder.addStatement("// Log error and continue with other beans");
@@ -631,7 +649,12 @@ public final class VeldSourceGenerator {
         
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .returns(returnType);
+                .returns(returnType)
+                .addComment("Check if container is shutdown - prevent bean access after shutdown");
+        methodBuilder.beginControlFlow("if ($N.get())", "shutdownInitiated");
+        methodBuilder.addStatement("throw new $T(\"Cannot access bean after container shutdown: $N\")",
+            ClassName.get("java.lang", "IllegalStateException"), methodName);
+        methodBuilder.endControlFlow();
         
         if (isConditional) {
             methodBuilder.addStatement("if ($N == null) return null", methodName);
@@ -650,6 +673,8 @@ public final class VeldSourceGenerator {
             javadoc.append("\n<p><b>Conditional:</b> May return null if condition is not met.</p>\n");
         }
         
+        javadoc.append("\n<p><b>Thread-safe:</b> This method is safe to call from multiple threads.</p>\n");
+        
         classBuilder.addMethod(methodBuilder.build());
     }
     
@@ -667,7 +692,12 @@ public final class VeldSourceGenerator {
 
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .returns(returnType);
+                .returns(returnType)
+                .addComment("Check if container is shutdown - prevent bean creation after shutdown");
+        methodBuilder.beginControlFlow("if ($N.get())", "shutdownInitiated");
+        methodBuilder.addStatement("throw new $T(\"Cannot create bean after container shutdown: $N\")",
+            ClassName.get("java.lang", "IllegalStateException"), methodName);
+        methodBuilder.endControlFlow();
 
         String sectionComment = getSectionForNode(node);
         if (!sectionComment.equals(lastSectionComment)) {
@@ -847,7 +877,14 @@ public final class VeldSourceGenerator {
                 .build();
     }
     
+    private List<String> cyclePath = new ArrayList<>();
+    private boolean cycleDetected = false;
+    
     private List<VeldNode> topologicalSort() {
+        // Reset cycle detection state
+        cycleDetected = false;
+        cyclePath.clear();
+        
         List<VeldNode> sorted = new ArrayList<>();
         Set<String> visited = new HashSet<>();
         Set<String> visiting = new HashSet<>();
@@ -857,17 +894,34 @@ public final class VeldSourceGenerator {
                 visit(node, visited, visiting, sorted);
             }
         }
+        
+        // If cycle was detected, report it
+        if (cycleDetected) {
+            String cycleString = String.join(" -> ", cyclePath);
+            error("Circular dependency detected: " + cycleString + "\n" +
+                  "Solution: Break the cycle by using @Lazy on one of the dependencies or refactoring");
+        }
+        
         return sorted;
     }
     
     private void visit(VeldNode node, Set<String> visited, Set<String> visiting, List<VeldNode> sorted) {
         if (visited.contains(node.getClassName())) return;
         if (visiting.contains(node.getClassName())) {
-            note("Cycle detected: " + node.getClassName());
+            // Build cycle path
+            int cycleStart = cyclePath.indexOf(node.getClassName());
+            if (cycleStart >= 0) {
+                cyclePath = cyclePath.subList(cycleStart, cyclePath.size());
+            } else {
+                cyclePath.clear();
+            }
+            cyclePath.add(node.getClassName());
+            cycleDetected = true;
             return;
         }
         
         visiting.add(node.getClassName());
+        cyclePath.add(node.getClassName());
         
         if (node.hasConstructorInjection()) {
             for (VeldNode.ParameterInfo param : node.getConstructorInfo().getParameters()) {
@@ -903,6 +957,7 @@ public final class VeldSourceGenerator {
         }
         
         visiting.remove(node.getClassName());
+        cyclePath.remove(cyclePath.size() - 1);
         visited.add(node.getClassName());
         sorted.add(node);
     }
@@ -951,17 +1006,36 @@ public final class VeldSourceGenerator {
         return CodeBlock.builder()
                 .add("Static Veld Dependency Injection Container.\n\n")
                 .add("<p>Generated by the Veld annotation processor.</p>\n\n")
+                .add("<p><b>Thread Safety:</b></p>\n")
+                .add("<ul>\n")
+                .add("<li>All singleton fields are <code>volatile</code> for safe concurrent access</li>\n")
+                .add("<li>Shutdown is idempotent and uses atomic flag (<code>getAndSet</code>)</li>\n")
+                .add("<li>Bean access after shutdown throws <code>IllegalStateException</code></li>\n")
+                .add("</ul>\n\n")
                 .add("<p><b>Features:</b></p>\n")
                 .add("<ul>\n")
                 .add("<li>Singletons: $L static fields</li>\n", singletons.size())
                 .add("<li>Prototypes: $L factory methods</li>\n", prototypes.size())
                 .add("<li>Conditions evaluated at static initialization (deterministic)</li>\n")
+                .add("<li>Circular dependencies detected at compile-time</li>\n")
+                .add("<li>@PostConstruct errors wrapped in <code>RuntimeException</code></li>\n")
+                .add("<li>AutoCloseable beans closed in reverse dependency order</li>\n")
                 .add("</ul>\n\n")
                 .add("<p><b>Lifecycle:</b></p>\n")
                 .add("<ul>\n")
                 .add("<li>@PostConstruct: invoked immediately after singleton initialization</li>\n")
                 .add("<li>@PreDestroy: invoked in shutdown() method (reverse order)</li>\n")
-                .add("</ul>\n")
+                .add("<li>AutoCloseable: <code>close()</code> called during shutdown</li>\n")
+                .add("</ul>\n\n")
+                .add("<p><b>Usage:</b></p>\n")
+                .add("<pre>\n")
+                .add("// Access a singleton\n")
+                .add("MyService service = Veld.myService();\n\n")
+                .add("// Create a prototype\n")
+                .add("MyPrototype proto = Veld.myPrototype();\n\n")
+                .add("// Shutdown (idempotent)\n")
+                .add("Veld.shutdown();\n")
+                .add("</pre>\n")
                 .build();
     }
     
