@@ -420,7 +420,7 @@ public final class VeldSourceGenerator {
         
         // Add PostConstruct call with error handling
         if (node.hasPostConstruct()) {
-            staticInitBuilder.addComment("Invoke @PostConstruct with error handling");
+            staticInitBuilder.add("// Invoke @PostConstruct with error handling\n");
             staticInitBuilder.beginControlFlow("try");
             if (node.hasPrivateFieldInjections() || node.hasPrivateMethodInjections()) {
                 ClassName accessorClass = ClassName.bestGuess(node.getAccessorClassName());
@@ -555,28 +555,36 @@ public final class VeldSourceGenerator {
      * For required dependencies not found in the graph, this should NOT generate code.
      * Instead, validateDependencies() should have already caught this and failed compilation.
      * This method should never be called for required dependencies.
+     * 
+     * @deprecated This method should never be reachable if validateDependencies() works correctly.
+     *             Required dependencies must be resolved at compile-time.
      */
     private CodeBlock getDependencyOrThrowUnresolved(String beanClassName, String dependencyType) {
+        // This should NEVER be called for required dependencies
+        // validateDependencies() should have caught all unresolved dependencies
         String beanSimpleName = beanClassName.substring(beanClassName.lastIndexOf('.') + 1);
         String depSimpleName = dependencyType.substring(dependencyType.lastIndexOf('.') + 1);
         
-        // This is a compile-time error, not runtime
-        error("Required dependency '" + depSimpleName + "' not found for '" + beanSimpleName + "'.\n" +
-              "Ensure the dependency is registered as a @Component or use @Optional for optional dependencies.");
+        // Report compile-time error
+        error("CRITICAL: Required dependency '" + depSimpleName + "' not found for '" + beanSimpleName + "'.\n" +
+              "This error should have been caught during dependency validation.\n" +
+              "Please ensure all required dependencies are annotated with @Component and conditions are met.");
         
-        // Return fallback code (should never be executed due to error above)
-        return CodeBlock.of("requireDependency(null, $S)", 
-            "Required dependency not found: " + dependencyType);
+        // Return code that will cause a compile error (unreachable)
+        // This ensures we don't generate runtime-failing code
+        return CodeBlock.of("$T.UNRESOLVED_DEPENDENCY", ClassName.get("io.github.yasmramos.veld", "Veld"));
     }
     
     private void addShutdownMethod(TypeSpec.Builder classBuilder, List<VeldNode> singletons, BeanExistenceGraph graph) {
         MethodSpec.Builder shutdownBuilder = MethodSpec.methodBuilder("shutdown")
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .addJavadoc("Shuts down the Veld container and invokes @PreDestroy methods.\n\n" +
+                .addJavadoc("Shuts down the Veld container and invokes lifecycle callbacks.\n\n" +
                             "<p>This method is <b>idempotent</b>: calling it multiple times is safe\n" +
-                            "and will only invoke @PreDestroy methods once.</p>\n" +
-                            "<p>@PreDestroy methods and close() for AutoCloseable beans are called\n" +
-                            "in reverse dependency order, ensuring dependents are destroyed before their dependencies.</p>\n" +
+                            "and will only invoke lifecycle callbacks once.</p>\n" +
+                            "<p>@PreDestroy methods are called in reverse dependency order,\n" +
+                            "ensuring dependents are destroyed before their dependencies.</p>\n" +
+                            "<p>For beans implementing AutoCloseable, <code>close()</code> is called\n" +
+                            "if the bean was detected as AutoCloseable during processing.</p>\n" +
                             "<p>Individual destruction failures are isolated and do not prevent\n" +
                             "other beans from being destroyed.</p>\n")
                 .addComment("Idempotency check - return early if already shutdown");
@@ -638,7 +646,8 @@ public final class VeldSourceGenerator {
         String methodName = node.getVeldName();
         String fieldName = node.getVeldName();
         boolean isConditional = result.isConditional(node.getClassName());
-        String flagName = result.getExistenceFlagName(node.getClassName());
+        String simpleName = node.getClassName().substring(node.getClassName().lastIndexOf('.') + 1);
+        String flagName = "HAS_BEAN_" + simpleName.toUpperCase();
         
         MethodSpec.Builder methodBuilder = MethodSpec.methodBuilder(methodName)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -1018,7 +1027,7 @@ public final class VeldSourceGenerator {
                 .add("<p><b>Thread Safety:</b></p>\n")
                 .add("<ul>\n")
                 .add("<li>All singleton fields are <code>volatile</code> for safe concurrent access</li>\n")
-                .add("<li>Shutdown is idempotent and uses atomic flag (<code>getAndSet</code>)</li>\n")
+                .add("<li>Shutdown is idempotent and uses atomic flag (<code>compareAndSet</code>)</li>\n")
                 .add("<li>Bean access after shutdown throws <code>IllegalStateException</code></li>\n")
                 .add("</ul>\n\n")
                 .add("<p><b>Features:</b></p>\n")
@@ -1028,13 +1037,14 @@ public final class VeldSourceGenerator {
                 .add("<li>Conditions evaluated at static initialization (deterministic)</li>\n")
                 .add("<li>Circular dependencies detected at compile-time</li>\n")
                 .add("<li>@PostConstruct errors wrapped in <code>RuntimeException</code></li>\n")
-                .add("<li>AutoCloseable beans closed in reverse dependency order</li>\n")
+                .add("<li>@PreDestroy methods invoked during shutdown()</li>\n")
+                .add("<li>AutoCloseable: <code>close()</code> called for detected AutoCloseable beans</li>\n")
                 .add("</ul>\n\n")
                 .add("<p><b>Lifecycle:</b></p>\n")
                 .add("<ul>\n")
                 .add("<li>@PostConstruct: invoked immediately after singleton initialization</li>\n")
                 .add("<li>@PreDestroy: invoked in shutdown() method (reverse order)</li>\n")
-                .add("<li>AutoCloseable: <code>close()</code> called during shutdown</li>\n")
+                .add("<li>AutoCloseable: <code>close()</code> called during shutdown if detected</li>\n")
                 .add("</ul>\n\n")
                 .add("<p><b>Usage:</b></p>\n")
                 .add("<pre>\n")
@@ -1078,7 +1088,9 @@ public final class VeldSourceGenerator {
     
     private List<DependencyError> validateDependencies() {
         List<DependencyError> errors = new ArrayList<>();
+        
         for (VeldNode node : nodes) {
+            // Validate constructor dependencies
             if (node.hasConstructorInjection()) {
                 VeldNode.ConstructorInfo ctor = node.getConstructorInfo();
                 for (int i = 0; i < ctor.getParameters().size(); i++) {
@@ -1089,11 +1101,50 @@ public final class VeldSourceGenerator {
                     if (nodeMap.get(param.getActualTypeName()) == null) {
                         errors.add(new DependencyError(
                             node.getClassName(), node.getVeldName(),
-                            param.getTypeName(), param.getActualTypeName(), i));
+                            "constructor", param.getTypeName(), param.getActualTypeName(), i));
                     }
                 }
             }
+            
+            // Validate field dependencies
+            if (node.hasFieldInjections()) {
+                int fieldIndex = 0;
+                for (VeldNode.FieldInjection field : node.getFieldInjections()) {
+                    // Skip @Value injections, @Optional, and Optional<T> wrappers
+                    if (field.isValueInjection() || field.isOptional() || field.isOptionalWrapper()) {
+                        continue;
+                    }
+                    if (nodeMap.get(field.getActualTypeName()) == null) {
+                        errors.add(new DependencyError(
+                            node.getClassName(), node.getVeldName(),
+                            "field", field.getFieldName(), field.getActualTypeName(), fieldIndex));
+                    }
+                    fieldIndex++;
+                }
+            }
+            
+            // Validate method dependencies
+            if (node.hasMethodInjections()) {
+                int methodIndex = 0;
+                for (VeldNode.MethodInjection method : node.getMethodInjections()) {
+                    int paramIndex = 0;
+                    for (VeldNode.ParameterInfo param : method.getParameters()) {
+                        if (param.isValueInjection() || param.isOptionalWrapper() || param.isProvider()) {
+                            continue;
+                        }
+                        if (nodeMap.get(param.getActualTypeName()) == null) {
+                            errors.add(new DependencyError(
+                                node.getClassName(), node.getVeldName(),
+                                "method", method.getMethodName() + "(" + param.getTypeName() + ")", 
+                                param.getActualTypeName(), methodIndex));
+                        }
+                        paramIndex++;
+                    }
+                    methodIndex++;
+                }
+            }
         }
+        
         return errors;
     }
     
@@ -1112,14 +1163,16 @@ public final class VeldSourceGenerator {
     private static class DependencyError {
         final String componentClass;
         final String componentName;
+        final String injectionPoint;  // "constructor", "field", or "method"
         final String paramType;
         final String actualType;
         final int paramPosition;
         
         DependencyError(String componentClass, String componentName,
-                       String paramType, String actualType, int paramPosition) {
+                       String injectionPoint, String paramType, String actualType, int paramPosition) {
             this.componentClass = componentClass;
             this.componentName = componentName;
+            this.injectionPoint = injectionPoint;
             this.paramType = paramType;
             this.actualType = actualType;
             this.paramPosition = paramPosition;
@@ -1127,11 +1180,12 @@ public final class VeldSourceGenerator {
         
         String getMessage() {
             return String.format(
-                "Compilation failed.\n\nUnresolved dependency:\n" +
+                "Compilation failed.\n\nUnresolved required dependency detected at compile-time:\n" +
                 "- Component: %s\n" +
-                "- Parameter #%d: %s (%s)\n\n" +
-                "Solution: Add @Component for %s or use @Named",
-                componentName, paramPosition + 1, paramType, actualType, actualType);
+                "- Injection point: %s\n" +
+                "- Dependency type: %s (%s)\n\n" +
+                "Solution: Add @Component annotation to %s, or mark the dependency as @Optional",
+                componentName, injectionPoint, paramType, actualType, actualType);
         }
     }
     

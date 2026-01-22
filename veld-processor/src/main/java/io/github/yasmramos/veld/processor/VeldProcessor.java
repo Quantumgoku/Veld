@@ -2392,6 +2392,17 @@ public class VeldProcessor extends AbstractProcessor {
             node.setHasAopWrapper(true);
         }
 
+        // Auto-closeable detection: Check if the component type implements AutoCloseable
+        TypeElement typeElement = info.getTypeElement();
+        if (typeElement != null) {
+            TypeMirror componentType = typeElement.asType();
+            TypeElement autoCloseableType = elementUtils.getTypeElement("java.lang.AutoCloseable");
+            if (autoCloseableType != null && typeUtils.isSubtype(componentType, autoCloseableType.asType())) {
+                node.setAutoCloseable(true);
+                note("  -> AutoCloseable bean detected");
+            }
+        }
+
         return node;
     }
     /**

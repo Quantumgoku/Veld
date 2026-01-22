@@ -87,6 +87,12 @@ public final class VeldNode {
      * If true, use the AOP wrapper class name for instantiation.
      */
     private boolean hasAopWrapper;
+    
+    /**
+     * Whether this component implements AutoCloseable.
+     * If true, close() will be called during shutdown.
+     */
+    private boolean isAutoCloseable;
 
     /**
      * Creates a new VeldNode.
@@ -410,6 +416,20 @@ public final class VeldNode {
     }
 
     /**
+     * Checks if this component implements AutoCloseable.
+     */
+    public boolean isAutoCloseable() {
+        return isAutoCloseable;
+    }
+
+    /**
+     * Sets whether this component implements AutoCloseable.
+     */
+    public void setAutoCloseable(boolean autoCloseable) {
+        this.isAutoCloseable = autoCloseable;
+    }
+
+    /**
      * Gets the actual class name to use for instantiation.
      * If hasAopWrapper is true, returns the AOP wrapper class name.
      */
@@ -543,6 +563,26 @@ public final class VeldNode {
         public boolean needsOptionalWrapper() {
             return isOptionalWrapper;
         }
+        
+        /**
+         * Returns the dependency category for this parameter.
+         * This helps clarify the handling requirements for the dependency.
+         */
+        public DependencyCategory getDependencyCategory() {
+            if (isValueInjection()) {
+                return DependencyCategory.VALUE;
+            }
+            if (isProvider) {
+                return DependencyCategory.PROVIDER;
+            }
+            if (isOptionalWrapper) {
+                return DependencyCategory.OPTIONAL;
+            }
+            if (isOptional) {
+                return DependencyCategory.OPTIONAL;
+            }
+            return DependencyCategory.REQUIRED;
+        }
     }
 
     /**
@@ -630,18 +670,62 @@ public final class VeldNode {
         }
 
         /**
+         * Returns true if this dependency should allow missing beans.
+         * Either @Optional annotation or Optional&lt;T&gt; type.
+         */
+        public boolean allowsMissing() {
+            return isOptional || isOptionalWrapper;
+        }
+        
+        /**
+         * Returns true if this dependency needs special handling (Provider, Lazy, or Optional).
+         */
+        public boolean needsSpecialHandling() {
+            return isProvider || isOptional || isOptionalWrapper;
+        }
+        
+        /**
+         * Returns the dependency category for this field injection.
+         * This helps clarify the handling requirements for the dependency.
+         */
+        public DependencyCategory getDependencyCategory() {
+            if (isValueInjection) {
+                return DependencyCategory.VALUE;
+            }
+            if (isProvider) {
+                return DependencyCategory.PROVIDER;
+            }
+            if (isOptionalWrapper) {
+                return DependencyCategory.OPTIONAL;
+            }
+            if (isOptional) {
+                return DependencyCategory.OPTIONAL;
+            }
+            return DependencyCategory.REQUIRED;
+        }
+        
+        /**
+         * Returns the @Value expression, or null if not a value injection.
+         * Note: FieldInjection only tracks whether it's a value injection,
+         * not the actual expression. For @Value fields, returns null.
+         */
+        public String getValueExpression() {
+            return isValueInjection ? "" : null;
+        }
+        
+        /**
+         * Returns true if this is a @Value injection.
+         */
+        public boolean isValueInjection() {
+            return isValueInjection;
+        }
+
+        /**
          * Checks if this field is private.
          * Private fields require an accessor class for injection.
          */
         public boolean isPrivate() {
             return isPrivate;
-        }
-
-        /**
-         * Checks if this is a @Value injection.
-         */
-        public boolean isValueInjection() {
-            return isValueInjection;
         }
 
         /**
