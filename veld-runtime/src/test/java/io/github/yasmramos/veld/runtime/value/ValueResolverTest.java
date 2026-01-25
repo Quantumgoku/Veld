@@ -571,4 +571,79 @@ class ValueResolverTest {
             assertEquals("MyApp", result);
         }
     }
+
+    @Nested
+    @DisplayName("Edge Case Tests")
+    class EdgeCaseTests {
+
+        @Test
+        @DisplayName("Should handle property with only dollar sign")
+        void shouldHandlePropertyWithOnlyDollarSign() {
+            String result = resolver.resolve("$");
+            assertEquals("$", result);
+        }
+
+        @Test
+        @DisplayName("Should handle property with only dollar and opening brace")
+        void shouldHandlePropertyWithOnlyDollarAndOpeningBrace() {
+            String result = resolver.resolve("${");
+            assertEquals("${", result);
+        }
+
+        @Test
+        @DisplayName("Should handle property with only closing brace")
+        void shouldHandlePropertyWithOnlyClosingBrace() {
+            String result = resolver.resolve("}");
+            assertEquals("}", result);
+        }
+
+        @Test
+        @DisplayName("Should handle consecutive dollar signs")
+        void shouldHandleConsecutiveDollarSigns() {
+            String result = resolver.resolve("$$");
+            assertEquals("$$", result);
+        }
+
+        @Test
+        @DisplayName("Should handle dollar sign followed by non-brace character")
+        void shouldHandleDollarSignFollowedByNonBraceCharacter() {
+            String result = resolver.resolve("$property");
+            assertEquals("$property", result);
+        }
+
+        @Test
+        @DisplayName("Should handle placeholder at start of string")
+        void shouldHandlePlaceholderAtStartOfString() {
+            resolver.setProperty("start", "value");
+            String result = resolver.resolve("${start}end");
+            assertEquals("valueend", result);
+        }
+
+        @Test
+        @DisplayName("Should handle placeholder at end of string")
+        void shouldHandlePlaceholderAtEndOfString() {
+            resolver.setProperty("end", "value");
+            String result = resolver.resolve("start${end}");
+            assertEquals("startvalue", result);
+        }
+
+        @Test
+        @DisplayName("Should handle multiple consecutive placeholders")
+        void shouldHandleMultipleConsecutivePlaceholders() {
+            resolver.setProperty("a", "1");
+            resolver.setProperty("b", "2");
+            resolver.setProperty("c", "3");
+
+            String result = resolver.resolve("${a}${b}${c}");
+            assertEquals("123", result);
+        }
+
+        @Test
+        @DisplayName("Should handle placeholder with default containing placeholder syntax")
+        void shouldHandlePlaceholderWithDefaultContainingPlaceholderSyntax() {
+            // Default value that looks like a placeholder should be treated as literal
+            String result = resolver.resolve("${missing.property:${also.missing}}");
+            assertEquals("${also.missing}", result);
+        }
+    }
 }
