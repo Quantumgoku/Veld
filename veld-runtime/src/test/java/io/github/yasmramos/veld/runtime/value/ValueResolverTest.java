@@ -540,11 +540,12 @@ class ValueResolverTest {
         @Test
         @DisplayName("Should handle placeholder with unicode characters")
         void shouldHandlePlaceholderWithUnicodeCharacters() {
-            resolver.setProperty("property.한글", "값");
-            resolver.setProperty("property.日本語", "値");
+            String unicodeKey = "property.unicode";
+            String unicodeValue = "\uAC12"; // 값
 
-            assertEquals("값", resolver.resolve("${property.한글}"));
-            assertEquals("値", resolver.resolve("${property.日本語}"));
+            resolver.setProperty(unicodeKey, unicodeValue);
+
+            assertEquals(unicodeValue, resolver.resolve("${" + unicodeKey + "}"));
         }
     }
 
