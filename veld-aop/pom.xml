@@ -24,6 +24,10 @@
             <groupId>io.github.yasmramos</groupId>
             <artifactId>veld-runtime</artifactId>
         </dependency>
+        <dependency>
+            <groupId>io.github.yasmramos</groupId>
+            <artifactId>veld-spi</artifactId>
+        </dependency>
 
         <!-- ASM for bytecode generation -->
         <dependency>
@@ -87,6 +91,7 @@
                             <goal>attach-artifact</goal>
                         </goals>
                         <configuration>
+                            <skip>${maven.javadoc.skip}</skip>
                             <artifacts>
                                 <artifact>
                                     <file>${project.build.directory}/${project.artifactId}-${project.version}-javadoc.jar</file>

@@ -7,6 +7,8 @@ import io.github.yasmramos.veld.processor.InjectionPoint.Dependency;
 import io.github.yasmramos.veld.processor.analyzer.ConditionAnalyzer;
 import io.github.yasmramos.veld.processor.analyzer.LifecycleAnalyzer;
 import io.github.yasmramos.veld.processor.spi.SpiExtensionExecutor;
+import io.github.yasmramos.veld.processor.spi.ProcessorToSpiConverter;
+import io.github.yasmramos.veld.aop.spi.SpiAopExtensionExecutor;
 import io.github.yasmramos.veld.spi.extension.VeldGraph;
 import io.github.yasmramos.veld.spi.extension.VeldProcessingContext;
 import java.io.IOException;
@@ -126,6 +128,7 @@ public class VeldProcessor extends AbstractProcessor {
     
     // SPI Extension Executor
     private SpiExtensionExecutor extensionExecutor;
+    private SpiAopExtensionExecutor aopExtensionExecutor;
     private VeldGraph spiGraph;
     private VeldProcessingContext spiContext;
     
@@ -170,6 +173,15 @@ public class VeldProcessor extends AbstractProcessor {
         
         if (extensionExecutor.hasExtensions()) {
             note("SPI Extensions loaded: " + extensionExecutor.getExtensionCount());
+        }
+        
+        // Initialize AOP SPI Extension Executor
+        // Note: AopGenerator is passed as null for now; full implementation pending
+        this.aopExtensionExecutor = new SpiAopExtensionExecutor(
+            options.areExtensionsEnabled(), null, messager, elementUtils, typeUtils, filer);
+        
+        if (aopExtensionExecutor.hasExtensions()) {
+            note("AOP Extensions loaded: " + aopExtensionExecutor.getExtensionCount());
         }
     }
     
@@ -1510,9 +1522,12 @@ public class VeldProcessor extends AbstractProcessor {
     
     private void generateRegistry() {
         try {
-            // Generate AOP wrapper classes for components with interceptors
-            AopClassGenerator aopGen = new AopClassGenerator(filer, messager, elementUtils, typeUtils);
-            Map<String, String> aopClassMap = aopGen.generateAopClasses(discoveredComponents);
+            // Generate AOP wrapper classes using SPI executor
+            // Convert ComponentInfo to ComponentData for SPI compatibility
+            Map<String, SpiAopExtensionExecutor.ComponentData> componentDataMap = 
+                ProcessorToSpiConverter.toComponentDataMap(discoveredComponents);
+            
+            Map<String, String> aopClassMap = aopExtensionExecutor.generateAopClasses(componentDataMap);
             if (!aopClassMap.isEmpty()) {
                 note("Generated " + aopClassMap.size() + " AOP wrapper classes");
                 // Update ComponentInfo with AOP wrapper information
