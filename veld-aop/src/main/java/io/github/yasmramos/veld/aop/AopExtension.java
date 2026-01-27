@@ -3,6 +3,8 @@ package io.github.yasmramos.veld.aop;
 import io.github.yasmramos.veld.spi.extension.ExtensionDescriptor;
 import io.github.yasmramos.veld.spi.extension.ExtensionPhase;
 import io.github.yasmramos.veld.spi.extension.VeldExtension;
+import io.github.yasmramos.veld.spi.extension.VeldGraph;
+import io.github.yasmramos.veld.spi.extension.VeldProcessingContext;
 
 import java.util.List;
 import java.util.Map;
@@ -124,16 +126,34 @@ public abstract class AopExtension implements VeldExtension {
     
     /**
      * Indica si esta extensión quiere generar wrappers AOP completamente customizados.
-     * 
+     *
      * <p>Si retorna {@code true}, {@link #generateAopWrappers} debe generar TODOS los wrappers
      * y la generación default (AopClassGenerator) será ignorada.</p>
-     * 
+     *
      * <p>Si retorna {@code false} (default), la generación default se ejecutará y las
      * extensiones pueden agregar comportamiento adicional.</p>
-     * 
+     *
      * @return true si quiere control total de la generación AOP
      */
     public boolean overridesDefaultGeneration() {
         return false;
+    }
+
+    /**
+     * Implementación por defecto de {@link VeldExtension#execute}.
+     *
+     * <p>Para extensiones AOP, la lógica principal se maneja a través de los métodos
+     * específicos del ciclo de vida AOP:
+     * {@link #beforeAopGeneration}, {@link #generateAopWrappers}, y {@link #afterAopGeneration}.
+     * Este método proporciona una implementación vacía que las extensiones AOP pueden
+     * sobrescribir si necesitan acceso directo al grafo de dependencias.</p>
+     *
+     * @param graph el grafo de dependencias inmutable
+     * @param context el contexto de procesamiento
+     */
+    @Override
+    public void execute(VeldGraph graph, VeldProcessingContext context) {
+        // Default: no-op para extensiones AOP
+        // La lógica AOP se maneja en beforeAopGeneration, generateAopWrappers, afterAopGeneration
     }
 }

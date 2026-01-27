@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.github.yasmramos.veld.processor;
+package io.github.yasmramos.veld.aop;
 
 import com.squareup.javapoet.AnnotationSpec;
 import com.squareup.javapoet.ArrayTypeName;
@@ -27,15 +27,10 @@ import com.squareup.javapoet.ParameterizedTypeName;
 import com.squareup.javapoet.TypeName;
 import com.squareup.javapoet.TypeSpec;
 import com.squareup.javapoet.TypeVariableName;
-import io.github.yasmramos.veld.aop.InvocationContext;
-import io.github.yasmramos.veld.aop.JoinPoint;
-import io.github.yasmramos.veld.aop.MethodInvocation;
 import io.github.yasmramos.veld.aop.interceptor.LoggingInterceptor;
 import io.github.yasmramos.veld.runtime.async.AsyncExecutor;
 import io.github.yasmramos.veld.runtime.async.SchedulerService;
 
-import javax.annotation.processing.Filer;
-import javax.annotation.processing.Messager;
 import javax.lang.model.element.AnnotationMirror;
 import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
@@ -68,6 +63,9 @@ import java.util.concurrent.TimeUnit;
  * <p>For each component with intercepted methods, generates a subclass
  * that inlines the interception logic, eliminating runtime proxies.
  *
+ * <p>This class works with {@link AopComponentNode} interface, allowing it
+ * to be used by the SPI system without direct dependencies on the processor module.
+ *
  * @author Veld Framework Team
  * @since 1.0.3
  */
@@ -92,9 +90,7 @@ public class AopClassGenerator {
         "io.github.yasmramos.veld.annotation.Valid"
     );
 
-    private final Filer filer;
-    private final Messager messager;
-    private final Elements elementUtils;
+    private final AopGenerationContext context;
     private final Types typeUtils;
 
     // Maps original class to its AOP wrapper class name
@@ -104,11 +100,9 @@ public class AopClassGenerator {
     // Using static field to persist across multiple instances of AopClassGenerator
     private static final Set<String> generatedAopClasses = Collections.synchronizedSet(new HashSet<>());
 
-    public AopClassGenerator(Filer filer, Messager messager, Elements elementUtils, Types typeUtils) {
-        this.filer = filer;
-        this.messager = messager;
-        this.elementUtils = elementUtils;
-        this.typeUtils = typeUtils;
+    public AopClassGenerator(AopGenerationContext context) {
+        this.context = context;
+        this.typeUtils = context.getTypeUtils();
     }
 
     /**
@@ -117,8 +111,8 @@ public class AopClassGenerator {
      * @param components the components to process
      * @return map of original class name to AOP wrapper class name
      */
-    public Map<String, String> generateAopClasses(List<ComponentInfo> components) {
-        for (ComponentInfo component : components) {
+    public Map<String, String> generateAopClasses(List<? extends AopComponentNode> components) {
+        for (AopComponentNode component : components) {
             if (hasInterceptedMethods(component)) {
                 String aopClassName = component.getClassName() + AOP_SUFFIX;
 
@@ -133,8 +127,9 @@ public class AopClassGenerator {
                 try {
                     generateAopClass(component);
                 } catch (IOException e) {
-                    messager.printMessage(Diagnostic.Kind.ERROR,
-                        "Failed to generate AOP class for " + component.getClassName() + ": " + e.getMessage());
+                    context.reportError(
+                        "Failed to generate AOP class for " + component.getClassName() + ": " + e.getMessage(),
+                        null);
                 }
             }
         }
@@ -144,8 +139,11 @@ public class AopClassGenerator {
     /**
      * Checks if a component has any intercepted methods.
      */
-    private boolean hasInterceptedMethods(ComponentInfo component) {
-        TypeElement typeElement = component.getTypeElement();
+    private boolean hasInterceptedMethods(AopComponentNode component) {
+        TypeMirror typeMirror = component.getTypeMirror();
+        if (typeMirror == null) return false;
+
+        TypeElement typeElement = (TypeElement) typeUtils.asElement(typeMirror);
         if (typeElement == null) return false;
 
         // Check class-level annotations
@@ -174,11 +172,17 @@ public class AopClassGenerator {
     /**
      * Generates an AOP wrapper class for a component.
      */
-    private void generateAopClass(ComponentInfo component) throws IOException {
-        TypeElement typeElement = component.getTypeElement();
+    private void generateAopClass(AopComponentNode component) throws IOException {
+        TypeMirror typeMirror = component.getTypeMirror();
+        TypeElement typeElement = (TypeElement) typeUtils.asElement(typeMirror);
+        if (typeElement == null) {
+            context.reportError("Cannot get TypeElement for component: " + component.getClassName(), null);
+            return;
+        }
+
         String originalClassName = component.getClassName();
-        String packageName = getPackageName(originalClassName);
-        String simpleClassName = getSimpleClassName(originalClassName);
+        String packageName = component.getPackageName();
+        String simpleClassName = component.getSimpleName();
         String aopClassName = originalClassName + AOP_SUFFIX;
         String aopSimpleClassName = simpleClassName + AOP_SUFFIX;
 
@@ -222,15 +226,14 @@ public class AopClassGenerator {
 
             // Build JavaFile and write
             JavaFile javaFile = JavaFile.builder(packageName, classBuilder.build()).build();
-            javaFile.writeTo(filer);
+            javaFile.writeTo(context.getFiler());
         } catch (javax.annotation.processing.FilerException e) {
             // File already exists (e.g., from previous processing round) - skip
-            messager.printMessage(Diagnostic.Kind.NOTE,
-                "AOP class already exists, skipping: " + aopClassName);
+            context.reportNote("AOP class already exists, skipping: " + aopClassName);
             return;
         }
 
-        messager.printMessage(Diagnostic.Kind.NOTE, "Generated AOP class: " + aopClassName);
+        context.reportNote("Generated AOP class: " + aopClassName);
     }
 
     /**
@@ -932,36 +935,6 @@ public class AopClassGenerator {
         return "__" + Character.toLowerCase(simpleName.charAt(0)) + simpleName.substring(1) + "__";
     }
 
-    /**
-     * Gets the package name from a fully qualified class name.
-     */
-    private String getPackageName(String className) {
-        // For inner classes (Outer$Inner), find the package by looking for $ first
-        int dollarSign = className.lastIndexOf('$');
-        if (dollarSign > 0) {
-            // It's an inner class, find the last dot before the $
-            int lastDot = className.lastIndexOf('.', dollarSign - 1);
-            return lastDot > 0 ? className.substring(0, lastDot) : "";
-        }
-        // Regular class - find the last dot
-        int lastDot = className.lastIndexOf('.');
-        return lastDot > 0 ? className.substring(0, lastDot) : "";
-    }
-
-    /**
-     * Gets the simple class name from a fully qualified class name.
-     */
-    private String getSimpleClassName(String className) {
-        // For inner classes (Outer$Inner), get just the inner class name
-        int lastDollar = className.lastIndexOf('$');
-        if (lastDollar >= 0) {
-            return className.substring(lastDollar + 1);
-        }
-        // For regular classes, get the class name after the last dot
-        int lastDot = className.lastIndexOf('.');
-        return lastDot > 0 ? className.substring(lastDot + 1) : className;
-    }
-    
     /**
      * Creates the @Generated annotation for the generated AOP class.
      */
