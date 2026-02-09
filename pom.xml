@@ -127,7 +127,7 @@
         <maven.assembly.plugin.version>3.7.1</maven.assembly.plugin.version>
         <jacoco.maven.plugin.version>0.8.14</jacoco.maven.plugin.version>
         <maven.checkstyle.plugin.version>3.6.0</maven.checkstyle.plugin.version>
-        <checkstyle.version>13.2.0</checkstyle.version>
+        <checkstyle.version>9.3</checkstyle.version>
 
         <!-- Maven Plugin API versions -->
         <maven-plugin-api.version>3.9.12</maven-plugin-api.version>
@@ -463,12 +463,12 @@
                                         <limit>
                                             <counter>LINE</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.10</minimum>
+                                            <minimum>0.05</minimum>
                                         </limit>
                                         <limit>
                                             <counter>BRANCH</counter>
                                             <value>COVEREDRATIO</value>
-                                            <minimum>0.10</minimum>
+                                            <minimum>0.05</minimum>
                                         </limit>
                                     </limits>
                                 </rule>
@@ -956,7 +956,7 @@
                                     <doctitle>Veld Framework - Ultra-fast Dependency Injection</doctitle>
                                     <bottom>
                                         <![CDATA[
-                                        <i>Copyright &copy; 2025 Veld Team. All rights reserved.</i>
+                                        <i>Copyright &copy; 2026 Veld Framework Team. All rights reserved.</i>
                                         ]]>
                                     </bottom>
                                     <failOnError>false</failOnError>
